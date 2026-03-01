@@ -598,6 +598,43 @@ git commit -m "feat: add CLI with commander, run command, wizard and entry point
 - zod 4.3.6 instalado (spec dizia v3, versao mais recente disponivel)
 - @faker-js/faker 10.3.0, commander 14.0.3, undici 7.22.0, p-limit 7.3.0
 
+## Should-fix corrections (post-review)
+
+### SF1 -- Wizard coverage (branches 53% -> 100%)
+
+Extraidas funcoes `validateUrl` e `validateTotal` de inline lambdas para funcoes nomeadas exportaveis em `src/cli/wizard.ts`. Adicionados 13 testes diretos (5 para validateUrl, 8 para validateTotal) cobrindo: URLs validas/invalidas, strings sem protocolo, strings vazias; total valido/invalido, 0, negativo, decimal, non-numeric, infinite, vazio.
+
+Coverage wizard.ts: 78.26% stmts / 53.33% branches / 33.33% funcs / 80% lines -> **100% / 100% / 100% / 100%**
+
+### SF2 -- CLI index.ts (0% -> 100%)
+
+Criado `tests/unit/cli/index.test.ts` com 5 testes: nome do programa, subcomandos run e init, versao, argumento file do run, opcao --output do init.
+
+Coverage index.ts: 0% -> **100% / 100% / 100% / 100%**
+
+### SF3 -- Exit silencioso para non-Error throws
+
+Adicionado `else { console.error("Unknown error"); }` antes do `process.exit(1)` em `src/cli/run-command.ts`. Adicionados 2 testes: string thrown e number thrown, ambos verificam `console.error("Unknown error")` e `process.exit(1)`.
+
+Coverage run-command.ts: 100% stmts / 83.33% branches -> **100% / 100%**
+
+### SF4 -- Wizard concurrency > total
+
+Adicionado ajuste `if (typeof total === "number" && concurrency > total) { concurrency = total; }` apos coletar total no wizard. Adicionados 3 testes: concurrency > total (clamped), total infinite (not clamped), concurrency <= total (not clamped).
+
+### Post-fix validation
+
+```
+$ pnpm build     # OK (exit code 0)
+$ pnpm test      # 211 tests passed (12 files)
+$ pnpm test:coverage
+ Statements: 98.36% (was 92.14%)
+ Branches:   93.22% (was 85.96%)
+ Functions:  96.77% (was 87.09%)
+ Lines:      99.57% (was 93.53%)
+ All thresholds >= 80% PASS
+```
+
 ## Handoff para Review
 
 ### O que mudou

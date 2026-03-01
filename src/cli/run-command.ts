@@ -33,6 +33,8 @@ export async function runCommand(file: string): Promise<void> {
       console.error(`Error: ${err.message}`);
     } else if (err instanceof Error) {
       console.error(`Unexpected error: ${err.message}`);
+    } else {
+      console.error("Unknown error");
     }
     process.exit(1);
   }
