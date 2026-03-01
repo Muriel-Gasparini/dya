@@ -87,6 +87,8 @@ describe("wizardCommand", () => {
     mockInput.mockResolvedValueOnce("50");
     // timeout
     mockNumber.mockResolvedValueOnce(5000);
+    // customize successRange? -> no
+    mockConfirm.mockResolvedValueOnce(false);
     // confirm save
     mockConfirm.mockResolvedValueOnce(true);
 
@@ -135,6 +137,8 @@ describe("wizardCommand", () => {
     mockInput.mockResolvedValueOnce("10");
     // timeout
     mockNumber.mockResolvedValueOnce(3000);
+    // customize successRange? -> no
+    mockConfirm.mockResolvedValueOnce(false);
     // confirm save
     mockConfirm.mockResolvedValueOnce(true);
 
@@ -167,6 +171,8 @@ describe("wizardCommand", () => {
     mockInput.mockResolvedValueOnce("1");
     // timeout
     mockNumber.mockResolvedValueOnce(5000);
+    // customize successRange? -> no
+    mockConfirm.mockResolvedValueOnce(false);
     // confirm save
     mockConfirm.mockResolvedValueOnce(true);
 
@@ -194,6 +200,8 @@ describe("wizardCommand", () => {
     mockInput.mockResolvedValueOnce("1");
     // timeout
     mockNumber.mockResolvedValueOnce(5000);
+    // customize successRange? -> no
+    mockConfirm.mockResolvedValueOnce(false);
     // confirm save -> NO
     mockConfirm.mockResolvedValueOnce(false);
 
@@ -253,6 +261,8 @@ describe("wizardCommand", () => {
     mockInput.mockResolvedValueOnce("infinite");
     // timeout
     mockNumber.mockResolvedValueOnce(5000);
+    // customize successRange? -> no
+    mockConfirm.mockResolvedValueOnce(false);
     // confirm save
     mockConfirm.mockResolvedValueOnce(true);
 
@@ -293,6 +303,8 @@ describe("wizardCommand", () => {
     mockInput.mockResolvedValueOnce("1");
     // timeout
     mockNumber.mockResolvedValueOnce(5000);
+    // customize successRange? -> no
+    mockConfirm.mockResolvedValueOnce(false);
     // confirm save
     mockConfirm.mockResolvedValueOnce(true);
 
@@ -336,6 +348,8 @@ describe("wizardCommand", () => {
     mockInput.mockResolvedValueOnce("5");
     // timeout
     mockNumber.mockResolvedValueOnce(5000);
+    // customize successRange? -> no
+    mockConfirm.mockResolvedValueOnce(false);
     // confirm save
     mockConfirm.mockResolvedValueOnce(true);
 
@@ -373,6 +387,8 @@ describe("wizardCommand", () => {
     mockInput.mockResolvedValueOnce("1");
     // timeout
     mockNumber.mockResolvedValueOnce(5000);
+    // customize successRange? -> no
+    mockConfirm.mockResolvedValueOnce(false);
     // confirm save
     mockConfirm.mockResolvedValueOnce(true);
 
@@ -399,6 +415,8 @@ describe("wizardCommand", () => {
     mockInput.mockResolvedValueOnce("1");
     // timeout
     mockNumber.mockResolvedValueOnce(5000);
+    // customize successRange? -> no
+    mockConfirm.mockResolvedValueOnce(false);
     // confirm save -> NO
     mockConfirm.mockResolvedValueOnce(false);
 
@@ -426,6 +444,8 @@ describe("wizardCommand", () => {
     mockInput.mockResolvedValueOnce("5");
     // timeout
     mockNumber.mockResolvedValueOnce(5000);
+    // customize successRange? -> no
+    mockConfirm.mockResolvedValueOnce(false);
     // confirm save
     mockConfirm.mockResolvedValueOnce(true);
 
@@ -454,6 +474,8 @@ describe("wizardCommand", () => {
     mockInput.mockResolvedValueOnce("infinite");
     // timeout
     mockNumber.mockResolvedValueOnce(5000);
+    // customize successRange? -> no
+    mockConfirm.mockResolvedValueOnce(false);
     // confirm save
     mockConfirm.mockResolvedValueOnce(true);
 
@@ -482,6 +504,8 @@ describe("wizardCommand", () => {
     mockInput.mockResolvedValueOnce("10");
     // timeout
     mockNumber.mockResolvedValueOnce(5000);
+    // customize successRange? -> no
+    mockConfirm.mockResolvedValueOnce(false);
     // confirm save
     mockConfirm.mockResolvedValueOnce(true);
 
@@ -493,6 +517,68 @@ describe("wizardCommand", () => {
     // concurrency should remain 3
     expect(content).toContain("concurrency: 3");
     expect(content).toContain("total: 10");
+  });
+
+  it("default successRange: not included in YAML when user declines customization", async () => {
+    // method
+    mockSelect.mockResolvedValueOnce("GET");
+    // url
+    mockInput.mockResolvedValueOnce("https://api.example.com");
+    // add header? -> no
+    mockConfirm.mockResolvedValueOnce(false);
+    // add query param? -> no
+    mockConfirm.mockResolvedValueOnce(false);
+    // concurrency
+    mockNumber.mockResolvedValueOnce(1);
+    // total
+    mockInput.mockResolvedValueOnce("1");
+    // timeout
+    mockNumber.mockResolvedValueOnce(5000);
+    // customize successRange? -> no
+    mockConfirm.mockResolvedValueOnce(false);
+    // confirm save
+    mockConfirm.mockResolvedValueOnce(true);
+
+    mockWriteFile.mockResolvedValue(undefined);
+
+    await wizardCommand({ output: "default-sr.yaml" });
+
+    const [, content] = mockWriteFile.mock.calls[0] as [string, string];
+    expect(content).not.toContain("successRange");
+  });
+
+  it("custom successRange: included in YAML when user customizes", async () => {
+    // method
+    mockSelect.mockResolvedValueOnce("GET");
+    // url
+    mockInput.mockResolvedValueOnce("https://api.example.com");
+    // add header? -> no
+    mockConfirm.mockResolvedValueOnce(false);
+    // add query param? -> no
+    mockConfirm.mockResolvedValueOnce(false);
+    // concurrency
+    mockNumber.mockResolvedValueOnce(1);
+    // total
+    mockInput.mockResolvedValueOnce("1");
+    // timeout
+    mockNumber.mockResolvedValueOnce(5000);
+    // customize successRange? -> yes
+    mockConfirm.mockResolvedValueOnce(true);
+    // min
+    mockNumber.mockResolvedValueOnce(200);
+    // max
+    mockNumber.mockResolvedValueOnce(399);
+    // confirm save
+    mockConfirm.mockResolvedValueOnce(true);
+
+    mockWriteFile.mockResolvedValue(undefined);
+
+    await wizardCommand({ output: "custom-sr.yaml" });
+
+    const [, content] = mockWriteFile.mock.calls[0] as [string, string];
+    expect(content).toContain("successRange");
+    expect(content).toContain("min: 200");
+    expect(content).toContain("max: 399");
   });
 });
 
