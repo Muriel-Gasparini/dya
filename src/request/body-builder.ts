@@ -30,6 +30,13 @@ export class DefaultBodyBuilder implements BodyBuilder {
         }
         return { body: fd, contentType: null };
       }
+      case "urlencoded": {
+        const params = new URLSearchParams();
+        for (const [k, v] of Object.entries(fields)) {
+          params.append(k, v);
+        }
+        return { body: params.toString(), contentType: "application/x-www-form-urlencoded" };
+      }
       case "none":
         return { body: null, contentType: null };
     }

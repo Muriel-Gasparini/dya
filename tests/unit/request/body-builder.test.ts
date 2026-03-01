@@ -97,6 +97,49 @@ describe("DefaultBodyBuilder", () => {
     });
   });
 
+  describe("urlencoded", () => {
+    it("should return URL-encoded string and contentType application/x-www-form-urlencoded", () => {
+      const fields = { key1: "value1", key2: "value2" };
+      const result = builder.build(fields, "urlencoded");
+
+      expect(result.body).toBe("key1=value1&key2=value2");
+      expect(result.contentType).toBe("application/x-www-form-urlencoded");
+    });
+
+    it("should return empty string and contentType application/x-www-form-urlencoded for empty fields", () => {
+      const result = builder.build({}, "urlencoded");
+
+      expect(result.body).toBe("");
+      expect(result.contentType).toBe("application/x-www-form-urlencoded");
+    });
+
+    it("should escape special characters (spaces, &, =) correctly via URLSearchParams", () => {
+      const fields = {
+        name: "John Doe",
+        query: "a&b=c",
+        path: "foo/bar baz",
+      };
+      const result = builder.build(fields, "urlencoded");
+
+      expect(result.contentType).toBe("application/x-www-form-urlencoded");
+      // URLSearchParams should properly encode special characters
+      const params = new URLSearchParams(result.body as string);
+      expect(params.get("name")).toBe("John Doe");
+      expect(params.get("query")).toBe("a&b=c");
+      expect(params.get("path")).toBe("foo/bar baz");
+    });
+
+    it("should preserve unicode characters in urlencoded body", () => {
+      const fields = { greeting: "Ola mundo", city: "Sao Paulo" };
+      const result = builder.build(fields, "urlencoded");
+
+      const params = new URLSearchParams(result.body as string);
+      expect(params.get("greeting")).toBe("Ola mundo");
+      expect(params.get("city")).toBe("Sao Paulo");
+      expect(result.contentType).toBe("application/x-www-form-urlencoded");
+    });
+  });
+
   describe("none", () => {
     it("should return body null and contentType null", () => {
       const result = builder.build({}, "none");

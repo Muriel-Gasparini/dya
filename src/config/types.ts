@@ -2,7 +2,7 @@
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 /** Tipo do body da request */
-export type BodyType = "json" | "formdata" | "none";
+export type BodyType = "json" | "formdata" | "urlencoded" | "none";
 
 /** Total de requests: numero finito ou modo infinito */
 export type RequestTotal = number | "infinite";

@@ -102,7 +102,7 @@ describe("repeaterConfigSchema", () => {
     });
 
     it("should accept all valid body types", () => {
-      const bodyTypes = ["json", "formdata", "none"] as const;
+      const bodyTypes = ["json", "formdata", "urlencoded", "none"] as const;
       for (const bodyType of bodyTypes) {
         const result = repeaterConfigSchema.parse({
           method: "POST",
