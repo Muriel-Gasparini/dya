@@ -11,6 +11,7 @@
 - T7 completa: RequestExecutor (interface ExecuteOptions + classe RequestExecutor com DI, timing via performance.now(), error wrapping) com TDD
 - T8 completa: ConsoleReporter (interface Reporter + classe ConsoleReporter com writer injection, reportResult para modo finito/infinito/erro, reportSummary com estatisticas formatadas) com TDD
 - T9 completa: RepeaterRunner (interface RunnerDeps + classe RepeaterRunner com p-limit, backpressure para modo infinito, SIGINT handling, counter-based summary, abort()) com TDD
+- T10 completa: CLI completa (commander setup, run-command handler, wizard interativo, entry point bin/repeater.ts) com TDD
 
 ## Progress
 
@@ -23,7 +24,7 @@
 - [x] T7 — RequestExecutor
 - [x] T8 — Reporter
 - [x] T9 — Runner
-- [ ] T10 — CLI
+- [x] T10 — CLI
 
 ## Decisions & tradeoffs
 
@@ -66,6 +67,13 @@
 - Decisao (T9): Type assertion `config.total as number` necessario porque TypeScript nao permite comparar `number <= (number | "infinite")`. Em runtime, ja verificamos `isInfinite` antes.
 - Decisao (T9): `this.aborted` resetado para false ao final de `execute()` para permitir reutilizacao da instancia.
 - Decisao (T9): SIGINT handler e o arrow function inline `() => { this.aborted = true }`. Coverage do v8 marca como funcao nao coberta (83.33% funcs) porque nao emitimos SIGINT nos testes. Funcionalidade equivalente testada via `abort()`.
+- Decisao (T10): TDD estrito -- testes escritos primeiro (RED), depois implementacao (GREEN). 9 testes no run-command.test.ts e 12 testes no wizard.test.ts.
+- Decisao (T10): commander v14.0.3 e @inquirer/prompts v8.3.0 -- APIs compativeis com o spec. Commander v14 tem mesma API do v13 para Command, .argument, .option, .action.
+- Decisao (T10): wizard coleta total como input (nao number) porque precisa aceitar a string "infinite" alem de numeros. Validacao inline no prompt com `validate()`.
+- Decisao (T10): GET e DELETE automaticamente setam bodyType='none' sem perguntar. POST/PUT/PATCH permitem escolher json/formdata/none.
+- Decisao (T10): Preview do YAML exibido entre delimitadores `--- Preview ---` e `--- Fim ---` conforme spec.
+- Decisao (T10): `src/cli/index.ts` tem 0% coverage individual porque e puro wiring do commander (sem logica testavel). Handlers testados separadamente. Coverage global >= 80% em todos os thresholds.
+- Decisao (T10): Mocking strategy -- run-command testa com vi.mock nos modulos importados (parseConfig, FakerTemplateEngine, RepeaterRunner). Wizard testa com vi.mock em @inquirer/prompts e node:fs/promises.
 
 ## Divergencias do spec
 
@@ -300,6 +308,31 @@ $ pnpm test
 - SIGINT cleanup: listener count antes == listener count depois
 - Content-Type precedence: bodyBuilder Content-Type sobrescreve config headers Content-Type
 
+### T10 — run-command (9 testes)
+- Happy path: parseConfig retorna config valida, runner.execute retorna summary -> sem exit
+- ConfigError: parseConfig lanca ConfigError -> stderr "Error: ...", exit 1
+- TemplateError: validateRecord lanca TemplateError -> stderr "Error: ...", exit 1
+- Unexpected Error: parseConfig lanca Error generico -> stderr "Unexpected error: ...", exit 1
+- Runner.execute chamado com config correto
+- validateRecord chamado para body E queryParams (em ordem)
+- runner.execute NAO chamado quando parseConfig falha
+- runner.execute NAO chamado quando validateRecord falha
+- Runner execution error -> exit 1
+
+### T10 — wizard (12 testes)
+- Happy path POST: inputs completos -> YAML gerado com method, url, headers, bodyType, body, queryParams, concurrency, total, timeoutMs
+- GET: bodyType automaticamente 'none', select de bodyType NAO chamado (apenas 1 select para method)
+- DELETE: bodyType automaticamente 'none'
+- Confirmacao "Nao" -> writeFile NAO chamado
+- YAML gerado por yaml.stringify (nao string manual)
+- Preview mostrado entre "--- Preview ---" e "--- Fim ---"
+- Output path customizado via opcao -o
+- Total "infinite" aceito como string literal no YAML
+- Multiplos headers adicionados corretamente
+- Multiplos body fields adicionados corretamente
+- FormData bodyType configurado corretamente
+- Confirmacao "Nao" -> mensagem "Configuracao descartada." exibida
+
 ## Validation evidence
 
 ### T3
@@ -464,6 +497,40 @@ $ pnpm test:coverage
  Summary: 97.71% stmts, 91.39% branches, 96.15% funcs, 99.39% lines
 ```
 
+### T10
+
+- Coverage (unit): run-command.ts 100% stmts, 83.33% branches, 100% funcs, 100% lines; wizard.ts 78.26% stmts, 53.33% branches, 33.33% funcs, 80% lines; index.ts 0% (pure wiring). Global: 92.14% stmts, 85.96% branches, 87.09% funcs, 93.53% lines (all above 80% threshold)
+- Test command(s): `pnpm build`, `pnpm test`, `pnpm test:coverage`, `node dist/bin/repeater.js --help`, `node dist/bin/repeater.js run --help`, `node dist/bin/repeater.js run tests/fixtures/valid-config.yaml`
+- Output/result:
+
+```
+$ pnpm build
+> repeater@0.1.0 build /home/tiuras/pessoal/repeater
+> tsc
+(exit code 0)
+
+$ pnpm test
+> repeater@0.1.0 test /home/tiuras/pessoal/repeater
+> vitest run
+ 11 test files, 188 tests passed
+
+$ pnpm test:coverage
+ Coverage report:
+ index.ts: 0% stmts (pure commander wiring)
+ run-command.ts: 100% stmts, 83.33% branches, 100% funcs, 100% lines
+ wizard.ts: 78.26% stmts, 53.33% branches, 33.33% funcs, 80% lines
+ Global Summary: 92.14% stmts, 85.96% branches, 87.09% funcs, 93.53% lines
+
+$ node dist/bin/repeater.js --help
+Usage: repeater [options] [command]
+HTTP request repeater CLI
+Commands: run <file>, init [options]
+
+$ node dist/bin/repeater.js run tests/fixtures/valid-config.yaml
+ 50 requests executadas (ERR Host nao encontrado -- URL ficticia)
+ Summary: Total 50, Success 0, Failures 50
+```
+
 ## Commands executed
 
 > Registre comandos importantes para reproduzir/verificar.
@@ -514,6 +581,14 @@ pnpm test               # 167 tests passed (9 files)
 pnpm test:coverage       # 97.71% stmts, 91.39% branches, 96.15% funcs, 99.39% lines
 pnpm build               # OK
 git commit -m "feat: add RepeaterRunner with p-limit concurrency and TDD tests (T9)"
+# T10:
+pnpm test               # 188 tests passed (11 files)
+pnpm test:coverage       # 92.14% stmts, 85.96% branches, 87.09% funcs, 93.53% lines
+pnpm build               # OK
+node dist/bin/repeater.js --help          # OK
+node dist/bin/repeater.js run --help      # OK
+node dist/bin/repeater.js run tests/fixtures/valid-config.yaml  # OK (50 requests, ERR expected)
+git commit -m "feat: add CLI with commander, run command, wizard and entry point (T10)"
 ```
 
 ## Notes
@@ -534,6 +609,7 @@ git commit -m "feat: add RepeaterRunner with p-limit concurrency and TDD tests (
 - T7: RequestExecutor (DI de HttpClient, timing com performance.now(), error wrapping, sempre retorna RequestResult) implementado com TDD
 - T8: ConsoleReporter (interface Reporter + classe ConsoleReporter com writer injection, reportResult finito/infinito/erro, reportSummary com estatisticas) implementado com TDD
 - T9: RepeaterRunner (interface RunnerDeps + classe RepeaterRunner com p-limit concurrency, backpressure para modo infinito, SIGINT handling, counter-based summary, abort()) implementado com TDD
+- T10: CLI completa (createProgram com commander, runCommand handler com DI wiring e error handling, wizardCommand com @inquirer/prompts interativo + YAML preview + save, bin/repeater.ts entry point) implementado com TDD
 
 ### Arquivos tocados
 - package.json, pnpm-lock.yaml
@@ -559,12 +635,20 @@ git commit -m "feat: add RepeaterRunner with p-limit concurrency and TDD tests (
 - **T8**: tests/unit/reporter.test.ts
 - **T9**: src/runner.ts
 - **T9**: tests/unit/runner.test.ts
+- **T10**: src/cli/index.ts, src/cli/run-command.ts, src/cli/wizard.ts, bin/repeater.ts
+- **T10**: tests/unit/cli/run-command.test.ts, tests/unit/cli/wizard.test.ts
 
 ### Como testar manualmente
 - `pnpm build` deve compilar sem erro
-- `pnpm test` deve rodar sem erro (167 testes, exit code 0)
+- `pnpm test` deve rodar sem erro (188 testes, exit code 0)
 - `pnpm test:coverage` deve passar com coverage >= 80% em todos os thresholds
+- `node dist/bin/repeater.js --help` deve mostrar help do CLI
+- `node dist/bin/repeater.js run --help` deve mostrar help do run
+- `node dist/bin/repeater.js init --help` deve mostrar help do init
+- `node dist/bin/repeater.js run tests/fixtures/valid-config.yaml` deve executar (requests falham por URL ficticia, mas sem erros de import/parsing)
+- `node dist/bin/repeater.js init` deve iniciar wizard interativo
 
 ### Preocupacoes / pontos de atencao
 - Versoes de deps sao mais recentes que o spec (vitest 4 vs 3, zod 4 vs 3, etc.) -- APIs compatveis confirmado na T3
 - @types/node adicionado como devDep (nao estava no spec original)
+- src/cli/index.ts tem 0% coverage individual (puro wiring commander) mas global esta acima de 80% em todos os thresholds
