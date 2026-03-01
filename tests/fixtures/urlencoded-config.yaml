@@ -1,0 +1,8 @@
+method: POST
+url: https://api.example.com/form
+bodyType: urlencoded
+body:
+  action: register
+  whatsapp: "{{faker.phone.number}}"
+concurrency: 3
+total: 10

@@ -12,7 +12,7 @@ export const repeaterConfigSchema = z
     method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]),
     url: z.string().url(),
     headers: z.record(z.string(), z.string()).default({}),
-    bodyType: z.enum(["json", "formdata", "none"]).default("none"),
+    bodyType: z.enum(["json", "formdata", "urlencoded", "none"]).default("none"),
     body: z.record(z.string(), z.string()).default({}),
     queryParams: z.record(z.string(), z.string()).default({}),
     concurrency: z.number().int().min(1).default(1),

@@ -60,6 +60,7 @@ export async function wizardCommand(options: WizardOptions): Promise<void> {
       choices: [
         { value: "json", name: "JSON" },
         { value: "formdata", name: "FormData" },
+        { value: "urlencoded", name: "urlencoded (application/x-www-form-urlencoded)" },
         { value: "none", name: "Nenhum" },
       ],
     });
