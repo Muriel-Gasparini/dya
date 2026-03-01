@@ -204,4 +204,22 @@ describe("runCommand", () => {
     );
     expect(exitSpy).toHaveBeenCalledWith(1);
   });
+
+  it("non-Error throw: prints 'Unknown error' to stderr and exits with code 1", async () => {
+    mockParseConfig.mockRejectedValue("string error thrown");
+
+    await runCommand("config.yaml");
+
+    expect(stderrSpy).toHaveBeenCalledWith("Unknown error");
+    expect(exitSpy).toHaveBeenCalledWith(1);
+  });
+
+  it("non-Error throw (number): prints 'Unknown error' to stderr and exits with code 1", async () => {
+    mockParseConfig.mockRejectedValue(42);
+
+    await runCommand("config.yaml");
+
+    expect(stderrSpy).toHaveBeenCalledWith("Unknown error");
+    expect(exitSpy).toHaveBeenCalledWith(1);
+  });
 });

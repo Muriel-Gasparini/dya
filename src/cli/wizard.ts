@@ -6,6 +6,24 @@ interface WizardOptions {
   output: string;
 }
 
+export function validateUrl(value: string): true | string {
+  try {
+    new URL(value);
+    return true;
+  } catch {
+    return "URL invalida. Informe uma URL completa (ex: https://api.example.com/endpoint)";
+  }
+}
+
+export function validateTotal(value: string): true | string {
+  if (value === "infinite") return true;
+  const num = Number(value);
+  if (Number.isNaN(num) || !Number.isInteger(num) || num < 1) {
+    return 'Informe um numero inteiro positivo ou "infinite"';
+  }
+  return true;
+}
+
 export async function wizardCommand(options: WizardOptions): Promise<void> {
   // 1. Method
   const method = await select({
@@ -22,14 +40,7 @@ export async function wizardCommand(options: WizardOptions): Promise<void> {
   // 2. URL
   const url = await input({
     message: "URL do endpoint:",
-    validate: (value: string) => {
-      try {
-        new URL(value);
-        return true;
-      } catch {
-        return "URL invalida. Informe uma URL completa (ex: https://api.example.com/endpoint)";
-      }
-    },
+    validate: validateUrl,
   });
 
   // 3. Headers (loop)
@@ -78,7 +89,7 @@ export async function wizardCommand(options: WizardOptions): Promise<void> {
   }
 
   // 7. Concurrency
-  const concurrency = (await number({
+  let concurrency = (await number({
     message: "Concorrencia (requests simultaneas):",
     default: 1,
     min: 1,
@@ -88,17 +99,15 @@ export async function wizardCommand(options: WizardOptions): Promise<void> {
   const totalRaw = await input({
     message: 'Total de requests (numero ou "infinite"):',
     default: "1",
-    validate: (value: string) => {
-      if (value === "infinite") return true;
-      const num = Number(value);
-      if (Number.isNaN(num) || !Number.isInteger(num) || num < 1) {
-        return 'Informe um numero inteiro positivo ou "infinite"';
-      }
-      return true;
-    },
+    validate: validateTotal,
   });
   const total: number | string =
     totalRaw === "infinite" ? "infinite" : Number(totalRaw);
+
+  // Adjust concurrency if it exceeds total
+  if (typeof total === "number" && concurrency > total) {
+    concurrency = total;
+  }
 
   // 9. Timeout
   const timeoutMs = (await number({

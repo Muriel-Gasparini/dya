@@ -15,7 +15,11 @@ vi.mock("node:fs/promises", () => ({
   access: vi.fn(),
 }));
 
-import { wizardCommand } from "../../../src/cli/wizard.js";
+import {
+  wizardCommand,
+  validateUrl,
+  validateTotal,
+} from "../../../src/cli/wizard.js";
 import { select, input, confirm, number } from "@inquirer/prompts";
 import { writeFile, access } from "node:fs/promises";
 
@@ -405,5 +409,161 @@ describe("wizardCommand", () => {
       c.includes("Configuracao descartada."),
     );
     expect(hasDiscarded).toBe(true);
+  });
+
+  it("adjusts concurrency to total when concurrency > total", async () => {
+    // method
+    mockSelect.mockResolvedValueOnce("GET");
+    // url
+    mockInput.mockResolvedValueOnce("https://api.example.com");
+    // add header? -> no
+    mockConfirm.mockResolvedValueOnce(false);
+    // add query param? -> no
+    mockConfirm.mockResolvedValueOnce(false);
+    // concurrency = 10 (greater than total)
+    mockNumber.mockResolvedValueOnce(10);
+    // total = 5
+    mockInput.mockResolvedValueOnce("5");
+    // timeout
+    mockNumber.mockResolvedValueOnce(5000);
+    // confirm save
+    mockConfirm.mockResolvedValueOnce(true);
+
+    mockWriteFile.mockResolvedValue(undefined);
+
+    await wizardCommand({ output: "adj.yaml" });
+
+    const [, content] = mockWriteFile.mock.calls[0] as [string, string];
+    // concurrency should be clamped to total (5), not 10
+    expect(content).toContain("concurrency: 5");
+    expect(content).toContain("total: 5");
+  });
+
+  it("does NOT adjust concurrency when total is 'infinite'", async () => {
+    // method
+    mockSelect.mockResolvedValueOnce("GET");
+    // url
+    mockInput.mockResolvedValueOnce("https://api.example.com");
+    // add header? -> no
+    mockConfirm.mockResolvedValueOnce(false);
+    // add query param? -> no
+    mockConfirm.mockResolvedValueOnce(false);
+    // concurrency = 10
+    mockNumber.mockResolvedValueOnce(10);
+    // total = infinite
+    mockInput.mockResolvedValueOnce("infinite");
+    // timeout
+    mockNumber.mockResolvedValueOnce(5000);
+    // confirm save
+    mockConfirm.mockResolvedValueOnce(true);
+
+    mockWriteFile.mockResolvedValue(undefined);
+
+    await wizardCommand({ output: "inf-adj.yaml" });
+
+    const [, content] = mockWriteFile.mock.calls[0] as [string, string];
+    // concurrency should remain 10 since total is infinite
+    expect(content).toContain("concurrency: 10");
+    expect(content).toContain("total: infinite");
+  });
+
+  it("does NOT adjust concurrency when concurrency <= total", async () => {
+    // method
+    mockSelect.mockResolvedValueOnce("GET");
+    // url
+    mockInput.mockResolvedValueOnce("https://api.example.com");
+    // add header? -> no
+    mockConfirm.mockResolvedValueOnce(false);
+    // add query param? -> no
+    mockConfirm.mockResolvedValueOnce(false);
+    // concurrency = 3
+    mockNumber.mockResolvedValueOnce(3);
+    // total = 10
+    mockInput.mockResolvedValueOnce("10");
+    // timeout
+    mockNumber.mockResolvedValueOnce(5000);
+    // confirm save
+    mockConfirm.mockResolvedValueOnce(true);
+
+    mockWriteFile.mockResolvedValue(undefined);
+
+    await wizardCommand({ output: "no-adj.yaml" });
+
+    const [, content] = mockWriteFile.mock.calls[0] as [string, string];
+    // concurrency should remain 3
+    expect(content).toContain("concurrency: 3");
+    expect(content).toContain("total: 10");
+  });
+});
+
+describe("validateUrl", () => {
+  it("returns true for a valid HTTP URL", () => {
+    expect(validateUrl("https://api.example.com/users")).toBe(true);
+  });
+
+  it("returns true for a valid URL with port and path", () => {
+    expect(validateUrl("http://localhost:3000/api/v1")).toBe(true);
+  });
+
+  it("returns error string for an invalid URL", () => {
+    const result = validateUrl("not-a-url");
+    expect(typeof result).toBe("string");
+    expect(result).toContain("URL invalida");
+  });
+
+  it("returns error string for empty string", () => {
+    const result = validateUrl("");
+    expect(typeof result).toBe("string");
+    expect(result).toContain("URL invalida");
+  });
+
+  it("returns error string for URL without protocol", () => {
+    const result = validateUrl("api.example.com/users");
+    expect(typeof result).toBe("string");
+    expect(result).toContain("URL invalida");
+  });
+});
+
+describe("validateTotal", () => {
+  it('returns true for "infinite"', () => {
+    expect(validateTotal("infinite")).toBe(true);
+  });
+
+  it("returns true for a valid positive integer string", () => {
+    expect(validateTotal("10")).toBe(true);
+  });
+
+  it("returns true for '1' (minimum valid)", () => {
+    expect(validateTotal("1")).toBe(true);
+  });
+
+  it("returns error string for '0'", () => {
+    const result = validateTotal("0");
+    expect(typeof result).toBe("string");
+    expect(result).toContain("numero inteiro positivo");
+  });
+
+  it("returns error string for negative number", () => {
+    const result = validateTotal("-5");
+    expect(typeof result).toBe("string");
+    expect(result).toContain("numero inteiro positivo");
+  });
+
+  it("returns error string for decimal number", () => {
+    const result = validateTotal("3.5");
+    expect(typeof result).toBe("string");
+    expect(result).toContain("numero inteiro positivo");
+  });
+
+  it("returns error string for non-numeric string", () => {
+    const result = validateTotal("abc");
+    expect(typeof result).toBe("string");
+    expect(result).toContain("numero inteiro positivo");
+  });
+
+  it("returns error string for empty string", () => {
+    const result = validateTotal("");
+    expect(typeof result).toBe("string");
+    expect(result).toContain("numero inteiro positivo");
   });
 });
