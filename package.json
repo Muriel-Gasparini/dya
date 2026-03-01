@@ -1,0 +1,38 @@
+{
+  "name": "repeater",
+  "version": "0.1.0",
+  "description": "CLI tool para disparar requests HTTP em massa",
+  "type": "module",
+  "bin": {
+    "repeater": "./dist/bin/repeater.js"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "tsc --noEmit"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.30.3",
+  "dependencies": {
+    "@faker-js/faker": "^10.3.0",
+    "@inquirer/prompts": "^8.3.0",
+    "commander": "^14.0.3",
+    "p-limit": "^7.3.0",
+    "undici": "^7.22.0",
+    "yaml": "^2.8.2",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^4.0.18",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
+  }
+}
