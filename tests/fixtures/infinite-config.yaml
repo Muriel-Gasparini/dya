@@ -1,0 +1,4 @@
+method: GET
+url: https://api.acme.com/v1/status
+total: infinite
+concurrency: 2
