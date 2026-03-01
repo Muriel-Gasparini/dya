@@ -7,6 +7,9 @@
 - T3 completa: Zod schema (repeaterConfigSchema) + YAML config parser (parseConfig) com TDD
 - T4 completa: FakerTemplateEngine (resolve, resolveRecord, validateRecord) com TDD
 - T5 completa: UndiciHttpClient (interface HttpClient + implementacao com undici, timeout, erros de rede) com TDD
+- T6 completa: DefaultBodyBuilder (interface BodyBuilder + implementacao json/formdata/none) com TDD
+- T7 completa: RequestExecutor (interface ExecuteOptions + classe RequestExecutor com DI, timing via performance.now(), error wrapping) com TDD
+- T8 completa: ConsoleReporter (interface Reporter + classe ConsoleReporter com writer injection, reportResult para modo finito/infinito/erro, reportSummary com estatisticas formatadas) com TDD
 
 ## Progress
 
@@ -15,9 +18,9 @@
 - [x] T3 — ConfigParser (schema + YAML)
 - [x] T4 — TemplateEngine
 - [x] T5 — HttpClient
-- [ ] T6 — BodyBuilder
-- [ ] T7 — RequestExecutor
-- [ ] T8 — Reporter
+- [x] T6 — BodyBuilder
+- [x] T7 — RequestExecutor
+- [x] T8 — Reporter
 - [ ] T9 — Runner
 - [ ] T10 — CLI
 
@@ -43,6 +46,18 @@
 - Decisao (T5): Para o body do undici.request, foi necessario um type assertion `as string | import("undici").FormData | undefined` porque `globalThis.FormData` (de @types/node) e `undici.FormData` sao estruturalmente incompativeis no TypeScript (falta `[Symbol.toStringTag]`). Em runtime sao o mesmo objeto.
 - Decisao (T5): Deteccao de AbortError usa `error.name === "AbortError"` (nao instanceof) conforme spec, para evitar problemas com diferentes contextos de importacao.
 - Decisao (T5): Headers de resposta com valores array (ex: set-cookie) sao convertidos pegando o primeiro elemento. Headers com valor undefined/null sao ignorados (nao incluidos no Record).
+- Decisao (T6): TDD estrito -- testes escritos primeiro (RED), depois implementacao (GREEN). 10 testes novos no body-builder.test.ts.
+- Decisao (T6): Usa globalThis.FormData (nativo Node 18+), sem dependencia externa. contentType null para formdata (undici seta boundary automaticamente).
+- Decisao (T7): TDD estrito -- testes escritos primeiro (RED), depois implementacao (GREEN). 21 testes novos no executor.test.ts.
+- Decisao (T7): Exportada interface `ExecuteOptions` separada (nao reutiliza HttpRequestOptions) para manter index no contrato sem poluir o HttpClient.
+- Decisao (T7): `performance.now()` usado via global (disponivel em Node 20+ sem import), com `Math.round` para converter para inteiro.
+- Decisao (T8): TDD estrito -- testes escritos primeiro (RED), depois implementacao (GREEN). 15 testes novos no reporter.test.ts.
+- Decisao (T8): WriterFunctions injetavel via construtor com defaults para console.log/console.error. Testes usam mock `(msg) => output.push(msg)` para capturar output.
+- Decisao (T8): Reporter NAO acumula resultados -- apenas formata e imprime. Summary e passado pronto pelo Runner.
+- Decisao (T8): Porcentagem formatada com `(count / total * 100).toFixed(1)%`. Quando total=0, exibe `0.0%` para evitar division by zero.
+- Decisao (T8): totalDurationMs >= 1000 e exibido em segundos com 1 decimal (ex: 12.5s). Abaixo de 1000, exibido em ms (ex: 500ms).
+- Decisao (T8): durationMs no reportResult exibido como inteiro via Math.round para legibilidade.
+- Decisao (T8): Teste de modo infinito corrigido -- assertion `not.toContain("/")` era falso positivo (URL contem /). Substituido por regex `not.toMatch(/\[\d+\/\d+\]/)` que verifica especificamente o padrao [index/total].
 
 ## Divergencias do spec
 
@@ -193,6 +208,58 @@ $ pnpm test
 - Headers da request passados corretamente para undici.request
 - Method passado corretamente para undici.request (PATCH)
 
+### T6 — BodyBuilder (10 testes)
+- json: campos normais -> retorna JSON.stringify + contentType 'application/json'
+- json: campos vazios -> retorna '{}' + contentType 'application/json'
+- json: caracteres especiais (aspas, newlines, tabs, backslash) -> JSON.stringify escapa corretamente, parsed back OK
+- json: unicode -> preservado corretamente
+- formdata: campos normais -> retorna FormData com campos populados + contentType null
+- formdata: campos vazios -> retorna FormData vazio (0 entries) + contentType null
+- formdata: verificar FormData.get(key) retorna valores corretos para cada campo
+- formdata: unicode -> preservado corretamente
+- none: retorna body null + contentType null
+- none: campos nao-vazios + bodyType 'none' -> ignora campos, retorna null
+
+### T7 — RequestExecutor (21 testes)
+- Happy path: httpClient retorna 200 -> RequestResult com status 200, error null
+- durationMs > 0 em cenario de sucesso
+- index propagado corretamente (42 -> result.index = 42)
+- method propagado corretamente (POST -> result.method = "POST")
+- url propagada corretamente (com query params)
+- Status 500 -> RequestResult com status 500, error null (nao e erro do executor)
+- Status 404 -> RequestResult com status 404, error null
+- Status 400 -> RequestResult com status 400, error null
+- Timeout -> RequestResult com status null, error contendo "Timeout"
+- durationMs positivo em timeout
+- index, method e url propagados em timeout
+- Erro de rede ECONNREFUSED -> RequestResult com status null, error contendo "ECONNREFUSED"
+- Erro de DNS ENOTFOUND -> RequestResult com status null, error contendo "ENOTFOUND"
+- durationMs positivo em erro de rede
+- Non-Error thrown ("string error") -> RequestResult com error = "string error"
+- Undefined thrown -> RequestResult com error string definida
+- TypeError thrown -> RequestResult com error contendo mensagem, NUNCA rejeita a promise
+- durationMs reflete tempo real (~50ms delay -> durationMs >= 40)
+- durationMs reflete tempo real em erro (~30ms delay -> durationMs >= 20)
+- httpClient.execute chamado com url, method, headers, body, timeoutMs corretos
+- httpClient.execute chamado com body null para GET
+
+### T8 — Reporter (15 testes)
+- reportResult modo finito: status 200, total 50 -> output contem [1/50], POST, 200, ms
+- reportResult modo infinito: status 200, total 'infinite' -> output contem [1], sem padrao [index/total]
+- reportResult com erro: status null, error "Timeout..." -> output contem ERR, "Timeout"
+- reportResult status 404 -> output contem 404, NAO contem ERR (HTTP errors sao responses validas)
+- reportResult status 500 -> output contem 500, NAO contem ERR
+- reportResult inclui URL completa no output (incluindo query params)
+- reportSummary completo: total, sucesso, falhas, avg, min, max, porcentagens, duracao total
+- reportSummary com 0 requests: nao lanca erro, exibe 0.0% (division by zero evitada)
+- reportSummary com todas falhas: successCount 0, 100.0% falhas
+- reportSummary header "Summary" e footer "End" presentes
+- reportSummary totalDurationMs >= 1000 -> exibido em segundos (1.5s)
+- reportSummary totalDurationMs < 1000 -> exibido em ms (500ms)
+- formatacao: durationMs exibido como inteiro (Math.round) -- 123.789 -> 124ms
+- formatacao: method exibido em uppercase
+- formatacao: avgDurationMs, minDurationMs, maxDurationMs arredondados como inteiros no summary
+
 ## Validation evidence
 
 ### T3
@@ -265,6 +332,75 @@ $ pnpm test:coverage
  Summary: 97.5% stmts, 88.67% branches, 100% funcs, 100% lines
 ```
 
+### T6
+
+- Coverage (unit): 100% stmts, 100% branches, 100% funcs, 100% lines (above 80% threshold)
+- Test command(s): `pnpm test`, `pnpm test:coverage`, `pnpm build`
+- Output/result:
+
+```
+$ pnpm build
+> repeater@0.1.0 build /home/tiuras/pessoal/repeater
+> tsc
+(exit code 0)
+
+$ pnpm test
+> repeater@0.1.0 test /home/tiuras/pessoal/repeater
+> vitest run
+ 6 test files, 102 tests passed
+
+$ pnpm test:coverage
+ Coverage report:
+ body-builder.ts: 100% stmts, 100% branches, 100% funcs, 100% lines
+ Summary: 97.7% stmts, 89.28% branches, 100% funcs, 100% lines
+```
+
+### T7
+
+- Coverage (unit): 100% stmts, 100% branches, 100% funcs, 100% lines (above 80% threshold)
+- Test command(s): `pnpm test`, `pnpm test:coverage`, `pnpm build`
+- Output/result:
+
+```
+$ pnpm build
+> repeater@0.1.0 build /home/tiuras/pessoal/repeater
+> tsc
+(exit code 0)
+
+$ pnpm test
+> repeater@0.1.0 test /home/tiuras/pessoal/repeater
+> vitest run
+ 7 test files, 123 tests passed
+
+$ pnpm test:coverage
+ Coverage report:
+ executor.ts: 100% stmts, 100% branches, 100% funcs, 100% lines
+ Summary: 97.95% stmts, 89.65% branches, 100% funcs, 100% lines
+```
+
+### T8
+
+- Coverage (unit): 100% stmts, 91.66% branches, 100% funcs, 100% lines (above 80% threshold)
+- Test command(s): `pnpm test`, `pnpm test:coverage`, `pnpm build`
+- Output/result:
+
+```
+$ pnpm build
+> repeater@0.1.0 build /home/tiuras/pessoal/repeater
+> tsc
+(exit code 0)
+
+$ pnpm test
+> repeater@0.1.0 test /home/tiuras/pessoal/repeater
+> vitest run
+ 8 test files, 138 tests passed
+
+$ pnpm test:coverage
+ Coverage report:
+ reporter.ts: 100% stmts, 91.66% branches, 100% funcs, 100% lines
+ Summary: 98.33% stmts, 90% branches, 100% funcs, 100% lines
+```
+
 ## Commands executed
 
 > Registre comandos importantes para reproduzir/verificar.
@@ -295,6 +431,21 @@ pnpm test               # 92 tests passed (5 files)
 pnpm test:coverage       # 97.5% stmts, 88.67% branches
 pnpm build               # OK
 git commit -m "feat: add UndiciHttpClient with timeout and network error handling (T5)"
+# T6:
+pnpm test               # 102 tests passed (6 files)
+pnpm test:coverage       # 97.7% stmts, 89.28% branches, 100% funcs, 100% lines
+pnpm build               # OK
+git commit -m "feat: add DefaultBodyBuilder with json, formdata and none support (T6)"
+# T7:
+pnpm test               # 123 tests passed (7 files)
+pnpm test:coverage       # 97.95% stmts, 89.65% branches, 100% funcs, 100% lines
+pnpm build               # OK
+git commit -m "feat: add RequestExecutor with TDD tests (T7)"
+# T8:
+pnpm test               # 138 tests passed (8 files)
+pnpm test:coverage       # 98.33% stmts, 90% branches, 100% funcs, 100% lines
+pnpm build               # OK
+git commit -m "feat: add ConsoleReporter with TDD tests (T8)"
 ```
 
 ## Notes
@@ -311,6 +462,9 @@ git commit -m "feat: add UndiciHttpClient with timeout and network error handlin
 - T3: Zod schema (repeaterConfigSchema) e YAML config parser (parseConfig) implementados com TDD
 - T4: FakerTemplateEngine com resolve, resolveRecord, validateRecord implementados com TDD
 - T5: UndiciHttpClient (interface HttpClient + implementacao com undici.request, timeout via AbortSignal, erros de rede) implementado com TDD
+- T6: DefaultBodyBuilder (interface BodyBuilder + implementacao json/formdata/none) implementado com TDD
+- T7: RequestExecutor (DI de HttpClient, timing com performance.now(), error wrapping, sempre retorna RequestResult) implementado com TDD
+- T8: ConsoleReporter (interface Reporter + classe ConsoleReporter com writer injection, reportResult finito/infinito/erro, reportSummary com estatisticas) implementado com TDD
 
 ### Arquivos tocados
 - package.json, pnpm-lock.yaml
@@ -328,10 +482,16 @@ git commit -m "feat: add UndiciHttpClient with timeout and network error handlin
 - **T4**: tests/unit/template/engine.test.ts
 - **T5**: src/request/http-client.ts
 - **T5**: tests/unit/request/http-client.test.ts
+- **T6**: src/request/body-builder.ts
+- **T6**: tests/unit/request/body-builder.test.ts
+- **T7**: src/request/executor.ts
+- **T7**: tests/unit/request/executor.test.ts
+- **T8**: src/reporter.ts
+- **T8**: tests/unit/reporter.test.ts
 
 ### Como testar manualmente
 - `pnpm build` deve compilar sem erro
-- `pnpm test` deve rodar sem erro (92 testes, exit code 0)
+- `pnpm test` deve rodar sem erro (138 testes, exit code 0)
 - `pnpm test:coverage` deve passar com coverage >= 80% em todos os thresholds
 
 ### Preocupacoes / pontos de atencao
