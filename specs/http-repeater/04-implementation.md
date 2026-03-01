@@ -6,6 +6,7 @@
 - T2 completa: tipos compartilhados (config + request) e classes de erro (ConfigError, TemplateError) com TDD
 - T3 completa: Zod schema (repeaterConfigSchema) + YAML config parser (parseConfig) com TDD
 - T4 completa: FakerTemplateEngine (resolve, resolveRecord, validateRecord) com TDD
+- T5 completa: UndiciHttpClient (interface HttpClient + implementacao com undici, timeout, erros de rede) com TDD
 
 ## Progress
 
@@ -13,7 +14,7 @@
 - [x] T2 — Types e Errors
 - [x] T3 — ConfigParser (schema + YAML)
 - [x] T4 — TemplateEngine
-- [ ] T5 — HttpClient
+- [x] T5 — HttpClient
 - [ ] T6 — BodyBuilder
 - [ ] T7 — RequestExecutor
 - [ ] T8 — Reporter
@@ -38,6 +39,10 @@
 - Decisao (T4): API do @faker-js/faker v10 e 100% compativel com v9 para todos os metodos usados (person.firstName, phone.number, string.numeric, string.alpha, datatype.boolean, number.int). Sem necessidade de adaptacoes.
 - Decisao (T4): Para cobrir o branch "path aponta para objeto, nao funcao" nos testes, usei `faker.rawDefinitions.airline` que e um path valido de 2 niveis que aponta para um objeto (nao funcao).
 - Decisao (T4): Para cobrir o branch fallback do parseArgs (argumento nao-numerico, nao-booleano, nao-quoted), usei `{{faker.string.alpha(cased)}}` que passa "cased" como string literal.
+- Decisao (T5): TDD estrito -- testes escritos primeiro (RED), depois implementacao (GREEN). 16 testes novos no http-client.test.ts.
+- Decisao (T5): Para o body do undici.request, foi necessario um type assertion `as string | import("undici").FormData | undefined` porque `globalThis.FormData` (de @types/node) e `undici.FormData` sao estruturalmente incompativeis no TypeScript (falta `[Symbol.toStringTag]`). Em runtime sao o mesmo objeto.
+- Decisao (T5): Deteccao de AbortError usa `error.name === "AbortError"` (nao instanceof) conforme spec, para evitar problemas com diferentes contextos de importacao.
+- Decisao (T5): Headers de resposta com valores array (ex: set-cookie) sao convertidos pegando o primeiro elemento. Headers com valor undefined/null sao ignorados (nao incluidos no Record).
 
 ## Divergencias do spec
 
@@ -47,6 +52,7 @@
 - Spec dizia: zod v3 -> Implementado: zod v4.3.6 -> Motivo: v4 era a versao mais recente disponivel no momento da instalacao. API 100% compativel para os metodos usados.
 - Spec nao mencionava `@types/node` -> Adicionado como devDependency -> Motivo: necessario para TypeScript reconhecer modulos `node:*` e namespace `NodeJS`.
 - Spec dizia: @faker-js/faker v9 -> Implementado: @faker-js/faker v10.3.0 -> Motivo: v10 era a versao instalada. API 100% compativel para todos os metodos usados no TemplateEngine.
+- T5: type assertion necessario no body para compatibilizar globalThis.FormData com undici.FormData no TypeScript (em runtime funciona sem cast).
 
 ## Validation evidence
 
@@ -168,6 +174,25 @@ $ pnpm test
 - Path que aponta para objeto (nao funcao) lanca TemplateError "nao e um metodo"
 - Record misto com templates validos e texto fixo nao lanca erro
 
+### T5 — HttpClient (16 testes)
+- Happy path: mock retorna statusCode 200 e headers -> execute retorna HttpResponse correto
+- Status codes variados (201, 400, 404, 500) -> todos retornados normalmente sem erro
+- Body string (JSON) -> undici.request recebe body como string
+- Body null (GET) -> undici.request recebe body undefined/null
+- Timeout (AbortError) -> lanca erro com "Timeout de 3000ms excedido"
+- Timeout com valor diferente (10000ms) -> mensagem inclui timeoutMs correto
+- Erro de rede ECONNREFUSED -> lanca erro com "Conexao recusada (ECONNREFUSED)"
+- Erro de DNS ENOTFOUND -> lanca erro com "Host nao encontrado (ENOTFOUND)"
+- Erro desconhecido (Error sem code) -> re-throw com mensagem original
+- Erro non-Error (string thrown) -> re-throw as-is (cobre branch `if (error instanceof Error)` false)
+- AbortSignal.timeout chamado com timeoutMs correto (spy verifica)
+- Signal passado para undici.request e instancia de AbortSignal
+- Response body consumido (.body.dump() chamado uma vez)
+- Headers de resposta com array (set-cookie) -> pega primeiro elemento
+- Headers de resposta com valor undefined -> ignorados gracefully
+- Headers da request passados corretamente para undici.request
+- Method passado corretamente para undici.request (PATCH)
+
 ## Validation evidence
 
 ### T3
@@ -217,6 +242,29 @@ $ pnpm test:coverage
  Summary: 96.72% stmts, 84.61% branches, 100% funcs, 100% lines
 ```
 
+### T5
+
+- Coverage (unit): 100% stmts, 100% branches, 100% funcs, 100% lines (above 80% threshold)
+- Test command(s): `pnpm test`, `pnpm test:coverage`, `pnpm build`
+- Output/result:
+
+```
+$ pnpm build
+> repeater@0.1.0 build /home/tiuras/pessoal/repeater
+> tsc
+(exit code 0)
+
+$ pnpm test
+> repeater@0.1.0 test /home/tiuras/pessoal/repeater
+> vitest run
+ 5 test files, 92 tests passed
+
+$ pnpm test:coverage
+ Coverage report:
+ http-client.ts: 100% stmts, 100% branches, 100% funcs, 100% lines
+ Summary: 97.5% stmts, 88.67% branches, 100% funcs, 100% lines
+```
+
 ## Commands executed
 
 > Registre comandos importantes para reproduzir/verificar.
@@ -242,6 +290,11 @@ pnpm test               # 76 tests passed (4 files)
 pnpm test:coverage       # 96.72% stmts, 84.61% branches
 pnpm build               # OK
 git commit -m "feat: add FakerTemplateEngine with resolve, resolveRecord, validateRecord (T4)"
+# T5:
+pnpm test               # 92 tests passed (5 files)
+pnpm test:coverage       # 97.5% stmts, 88.67% branches
+pnpm build               # OK
+git commit -m "feat: add UndiciHttpClient with timeout and network error handling (T5)"
 ```
 
 ## Notes
@@ -257,6 +310,7 @@ git commit -m "feat: add FakerTemplateEngine with resolve, resolveRecord, valida
 - Projeto criado do zero com toda infraestrutura de build/test
 - T3: Zod schema (repeaterConfigSchema) e YAML config parser (parseConfig) implementados com TDD
 - T4: FakerTemplateEngine com resolve, resolveRecord, validateRecord implementados com TDD
+- T5: UndiciHttpClient (interface HttpClient + implementacao com undici.request, timeout via AbortSignal, erros de rede) implementado com TDD
 
 ### Arquivos tocados
 - package.json, pnpm-lock.yaml
@@ -272,10 +326,12 @@ git commit -m "feat: add FakerTemplateEngine with resolve, resolveRecord, valida
 - **T3**: tests/fixtures/valid-config.yaml, minimal-config.yaml, formdata-config.yaml, infinite-config.yaml, invalid-config.yaml
 - **T4**: src/template/engine.ts
 - **T4**: tests/unit/template/engine.test.ts
+- **T5**: src/request/http-client.ts
+- **T5**: tests/unit/request/http-client.test.ts
 
 ### Como testar manualmente
 - `pnpm build` deve compilar sem erro
-- `pnpm test` deve rodar sem erro (76 testes, exit code 0)
+- `pnpm test` deve rodar sem erro (92 testes, exit code 0)
 - `pnpm test:coverage` deve passar com coverage >= 80% em todos os thresholds
 
 ### Preocupacoes / pontos de atencao
