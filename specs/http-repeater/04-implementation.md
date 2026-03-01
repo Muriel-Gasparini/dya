@@ -10,6 +10,7 @@
 - T6 completa: DefaultBodyBuilder (interface BodyBuilder + implementacao json/formdata/none) com TDD
 - T7 completa: RequestExecutor (interface ExecuteOptions + classe RequestExecutor com DI, timing via performance.now(), error wrapping) com TDD
 - T8 completa: ConsoleReporter (interface Reporter + classe ConsoleReporter com writer injection, reportResult para modo finito/infinito/erro, reportSummary com estatisticas formatadas) com TDD
+- T9 completa: RepeaterRunner (interface RunnerDeps + classe RepeaterRunner com p-limit, backpressure para modo infinito, SIGINT handling, counter-based summary, abort()) com TDD
 
 ## Progress
 
@@ -21,7 +22,7 @@
 - [x] T6 — BodyBuilder
 - [x] T7 — RequestExecutor
 - [x] T8 — Reporter
-- [ ] T9 — Runner
+- [x] T9 — Runner
 - [ ] T10 — CLI
 
 ## Decisions & tradeoffs
@@ -58,6 +59,13 @@
 - Decisao (T8): totalDurationMs >= 1000 e exibido em segundos com 1 decimal (ex: 12.5s). Abaixo de 1000, exibido em ms (ex: 500ms).
 - Decisao (T8): durationMs no reportResult exibido como inteiro via Math.round para legibilidade.
 - Decisao (T8): Teste de modo infinito corrigido -- assertion `not.toContain("/")` era falso positivo (URL contem /). Substituido por regex `not.toMatch(/\[\d+\/\d+\]/)` que verifica especificamente o padrao [index/total].
+- Decisao (T9): TDD estrito -- testes escritos primeiro (RED), depois implementacao (GREEN). 29 testes novos no runner.test.ts.
+- Decisao (T9): Backpressure no loop infinito -- o for loop aguarda `Promise.race(pending)` quando todos os slots de concorrencia estao ocupados. Sem isso, o loop cria milhoes de promises na fila do p-limit e causa OOM (JavaScript heap out of memory). Essa tecnica e essencial e nao estava explicitamente no spec.
+- Decisao (T9): Para testar modo infinito sem depender de setTimeout/timing, o mock do requestExecutor chama `runner.abort()` internamente apos N execucoes. Isso garante testes deterministicos e rapidos.
+- Decisao (T9): URL final preserva config.url original quando queryParams e vazio (sem criar new URL() + toString() desnecessariamente, evitando trailing slash ou encoding indesejado).
+- Decisao (T9): Type assertion `config.total as number` necessario porque TypeScript nao permite comparar `number <= (number | "infinite")`. Em runtime, ja verificamos `isInfinite` antes.
+- Decisao (T9): `this.aborted` resetado para false ao final de `execute()` para permitir reutilizacao da instancia.
+- Decisao (T9): SIGINT handler e o arrow function inline `() => { this.aborted = true }`. Coverage do v8 marca como funcao nao coberta (83.33% funcs) porque nao emitimos SIGINT nos testes. Funcionalidade equivalente testada via `abort()`.
 
 ## Divergencias do spec
 
@@ -68,6 +76,8 @@
 - Spec nao mencionava `@types/node` -> Adicionado como devDependency -> Motivo: necessario para TypeScript reconhecer modulos `node:*` e namespace `NodeJS`.
 - Spec dizia: @faker-js/faker v9 -> Implementado: @faker-js/faker v10.3.0 -> Motivo: v10 era a versao instalada. API 100% compativel para todos os metodos usados no TemplateEngine.
 - T5: type assertion necessario no body para compatibilizar globalThis.FormData com undici.FormData no TypeScript (em runtime funciona sem cast).
+- T9: Spec dizia p-limit v6 -> Implementado: p-limit 7.3.0 -> Motivo: versao instalada e 7.x. Import `import pLimit from 'p-limit'` funciona identicamente.
+- T9: Adicionado mecanismo de backpressure (Promise.race) nao mencionado no spec -> Motivo: sem backpressure, modo infinito causa OOM ao acumular promises na fila do p-limit.
 
 ## Validation evidence
 
@@ -260,6 +270,36 @@ $ pnpm test
 - formatacao: method exibido em uppercase
 - formatacao: avgDurationMs, minDurationMs, maxDurationMs arredondados como inteiros no summary
 
+### T9 — Runner (29 testes)
+- Happy path finito: total=3, concurrency=1 -> summary com 3 requests, 3 sucesso, 0 falha
+- reportResult chamado 3x e reportSummary chamado 1x para total=3
+- config.total passado como segundo argumento para reportResult
+- avg/min/max durations calculados corretamente (100, 200, 300 -> avg=200, min=100, max=300)
+- totalDurationMs >= 0
+- Total=1: unica request executada, reportSummary chamado
+- Concorrencia: total=5, concurrency=2 -> no maximo 2 em voo simultaneamente
+- Concorrencia = total: total=3, concurrency=3 -> todas disparadas, 3 executadas
+- Sequencial: concurrency=1 -> requests executadas em ordem [1, 2, 3]
+- Modo infinito + abort: abort() apos 3 requests -> summary parcial com >= 3 requests
+- Modo infinito: reportResult recebe "infinite" como total
+- Body type none: bodyBuilder.build chamado com {} e "none"
+- Body type json: bodyBuilder.build chamado com campos resolvidos pelo templateEngine
+- Content-Type do bodyBuilder adicionado aos headers da request
+- Content-Type null: header Content-Type nao setado
+- Body passado corretamente para requestExecutor.execute
+- Query params: appendados na URL final via URL.searchParams
+- Query params vazio: URL nao modificada
+- Template resolution: resolveRecord chamado para body e queryParams
+- Templates resolvidos N vezes para N requests (2 calls x 3 requests = 6)
+- Summary calculation: status 200, 201, 299 = sucesso; 300, 404, 500 = falha
+- Status null (erro rede) contado como falha
+- 0 requests: avg=0, min=0, max=0 (nao Infinity)
+- Todas falhando: summary com 0 sucesso, N falhas, avg correto
+- Request options: index, method, url, headers, body, timeoutMs passados corretamente
+- Index incremental: 1, 2, 3 para 3 requests
+- SIGINT cleanup: listener count antes == listener count depois
+- Content-Type precedence: bodyBuilder Content-Type sobrescreve config headers Content-Type
+
 ## Validation evidence
 
 ### T3
@@ -401,6 +441,29 @@ $ pnpm test:coverage
  Summary: 98.33% stmts, 90% branches, 100% funcs, 100% lines
 ```
 
+### T9
+
+- Coverage (unit): 96.36% stmts, 95.65% branches, 83.33% funcs, 98.03% lines (above 80% threshold)
+- Test command(s): `pnpm test`, `pnpm test:coverage`, `pnpm build`
+- Output/result:
+
+```
+$ pnpm build
+> repeater@0.1.0 build /home/tiuras/pessoal/repeater
+> tsc
+(exit code 0)
+
+$ pnpm test
+> repeater@0.1.0 test /home/tiuras/pessoal/repeater
+> vitest run
+ 9 test files, 167 tests passed
+
+$ pnpm test:coverage
+ Coverage report:
+ runner.ts: 96.36% stmts, 95.65% branches, 83.33% funcs, 98.03% lines
+ Summary: 97.71% stmts, 91.39% branches, 96.15% funcs, 99.39% lines
+```
+
 ## Commands executed
 
 > Registre comandos importantes para reproduzir/verificar.
@@ -446,6 +509,11 @@ pnpm test               # 138 tests passed (8 files)
 pnpm test:coverage       # 98.33% stmts, 90% branches, 100% funcs, 100% lines
 pnpm build               # OK
 git commit -m "feat: add ConsoleReporter with TDD tests (T8)"
+# T9:
+pnpm test               # 167 tests passed (9 files)
+pnpm test:coverage       # 97.71% stmts, 91.39% branches, 96.15% funcs, 99.39% lines
+pnpm build               # OK
+git commit -m "feat: add RepeaterRunner with p-limit concurrency and TDD tests (T9)"
 ```
 
 ## Notes
@@ -465,6 +533,7 @@ git commit -m "feat: add ConsoleReporter with TDD tests (T8)"
 - T6: DefaultBodyBuilder (interface BodyBuilder + implementacao json/formdata/none) implementado com TDD
 - T7: RequestExecutor (DI de HttpClient, timing com performance.now(), error wrapping, sempre retorna RequestResult) implementado com TDD
 - T8: ConsoleReporter (interface Reporter + classe ConsoleReporter com writer injection, reportResult finito/infinito/erro, reportSummary com estatisticas) implementado com TDD
+- T9: RepeaterRunner (interface RunnerDeps + classe RepeaterRunner com p-limit concurrency, backpressure para modo infinito, SIGINT handling, counter-based summary, abort()) implementado com TDD
 
 ### Arquivos tocados
 - package.json, pnpm-lock.yaml
@@ -488,10 +557,12 @@ git commit -m "feat: add ConsoleReporter with TDD tests (T8)"
 - **T7**: tests/unit/request/executor.test.ts
 - **T8**: src/reporter.ts
 - **T8**: tests/unit/reporter.test.ts
+- **T9**: src/runner.ts
+- **T9**: tests/unit/runner.test.ts
 
 ### Como testar manualmente
 - `pnpm build` deve compilar sem erro
-- `pnpm test` deve rodar sem erro (138 testes, exit code 0)
+- `pnpm test` deve rodar sem erro (167 testes, exit code 0)
 - `pnpm test:coverage` deve passar com coverage >= 80% em todos os thresholds
 
 ### Preocupacoes / pontos de atencao
