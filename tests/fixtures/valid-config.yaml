@@ -1,0 +1,16 @@
+method: POST
+url: https://api.acme.com/v1/accounts
+headers:
+  Content-Type: application/json
+  Authorization: Bearer tk_live_abc123
+bodyType: json
+body:
+  name: "{{faker.person.fullName}}"
+  email: "{{faker.internet.email}}"
+  phone: "{{faker.phone.number}}"
+queryParams:
+  source: cli-repeater
+  campaign: load-test-2024
+concurrency: 5
+total: 50
+timeoutMs: 5000

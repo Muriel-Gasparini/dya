@@ -1,0 +1,14 @@
+method: POST
+url: https://api.acme.com/v1/contacts
+headers:
+  Authorization: Bearer tk_live_xyz789
+bodyType: formdata
+body:
+  firstName: "{{faker.person.firstName}}"
+  lastName: "{{faker.person.lastName}}"
+  email: "{{faker.internet.email}}"
+  company: "{{faker.company.name}}"
+  phone: "BR{{faker.string.numeric(11)}}"
+concurrency: 3
+total: 10
+timeoutMs: 8000
