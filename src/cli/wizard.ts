@@ -117,6 +117,28 @@ export async function wizardCommand(options: WizardOptions): Promise<void> {
     min: 100,
   })) as number;
 
+  // 10. Success range (optional)
+  const customizeSuccessRange = await confirm({
+    message: "Customizar range de sucesso? (default: 200-299)",
+  });
+
+  let successRange: { min: number; max: number } | undefined;
+  if (customizeSuccessRange) {
+    const srMin = (await number({
+      message: "Status code minimo (sucesso):",
+      default: 200,
+      min: 100,
+      max: 599,
+    })) as number;
+    const srMax = (await number({
+      message: "Status code maximo (sucesso):",
+      default: 299,
+      min: 100,
+      max: 599,
+    })) as number;
+    successRange = { min: srMin, max: srMax };
+  }
+
   // Build config object
   const config: Record<string, unknown> = {
     method,
@@ -129,6 +151,10 @@ export async function wizardCommand(options: WizardOptions): Promise<void> {
     total,
     timeoutMs,
   };
+
+  if (successRange) {
+    config.successRange = successRange;
+  }
 
   // 10. Preview
   const yamlString = stringify(config);

@@ -20,6 +20,15 @@ export const repeaterConfigSchema = z
       .union([z.literal("infinite"), z.number().int().min(1)])
       .default(1),
     timeoutMs: z.number().int().min(1).default(5000),
+    successRange: z
+      .object({
+        min: z.number().int().min(100).max(599),
+        max: z.number().int().min(100).max(599),
+      })
+      .default({ min: 200, max: 299 })
+      .refine((data) => data.min <= data.max, {
+        message: "min deve ser <= max",
+      }),
   })
   .refine(
     (data) =>

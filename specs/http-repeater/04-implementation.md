@@ -635,6 +635,70 @@ $ pnpm test:coverage
  All thresholds >= 80% PASS
 ```
 
+## Feature: successRange configuravel
+
+### Descricao
+
+Adicionado campo `successRange` configuravel ao YAML do HTTP Repeater para definir quais status codes contam como sucesso. Default: `{ min: 200, max: 299 }` (apenas 2xx, comportamento anterior). Range e inclusive (min <= status <= max).
+
+### Arquivos alterados
+
+- `src/config/types.ts` -- adicionado campo `successRange: { min: number; max: number }` ao `RepeaterConfig`
+- `src/config/schema.ts` -- adicionado zod schema para successRange com default, validacao 100-599, e refine min <= max
+- `src/runner.ts` -- alterada logica de sucesso de hardcoded `>= 200 && < 300` para `>= config.successRange.min && <= config.successRange.max`
+- `src/cli/wizard.ts` -- adicionada pergunta "Customizar range de sucesso?" com inputs para min e max; se nao customizar, successRange nao e incluido no YAML (usa default do schema)
+- `tests/unit/config/schema.test.ts` -- 9 testes novos: default, custom, min=max, min>max rejeitado, min<100, max>600, non-integer, boundary 100-599
+- `tests/unit/runner.test.ts` -- 4 testes novos: 302 com range {200,399}=sucesso, 302 com default=falha, inclusive boundary, default successRange no makeConfig
+- `tests/unit/cli/wizard.test.ts` -- 2 testes novos (default sem customizar, custom com min/max) + todos testes existentes atualizados com mock de confirm de successRange
+
+### Decisoes
+
+- Decisao: Range inclusive (min <= status <= max) em vez de half-open [min, max) -> Motivo: mais intuitivo para o usuario. Se configurar max: 399, status 399 conta como sucesso.
+- Decisao: Wizard nao inclui successRange no YAML quando usuario nao customiza -> Motivo: YAML mais limpo, schema aplica default automaticamente.
+
+### Validation evidence
+
+```
+$ pnpm build
+> repeater@0.1.0 build /home/tiuras/pessoal/repeater
+> tsc
+(exit code 0)
+
+$ pnpm test
+> 12 test files, 229 tests passed (was 215)
+
+$ pnpm test:coverage
+ Statements: 98.44% (was 98.36%)
+ Branches:   93.49% (was 93.22%)
+ Functions:  96.87% (was 96.77%)
+ Lines:      99.59% (was 99.57%)
+ All thresholds >= 80% PASS
+```
+
+### Testes adicionados (14 novos)
+
+**schema.test.ts (9 testes)**:
+- Default successRange = { min: 200, max: 299 }
+- Custom successRange aceito
+- min = max (single status) aceito
+- min > max rejeitado
+- min < 100 rejeitado
+- max > 599 rejeitado
+- Non-integer min rejeitado
+- Non-integer max rejeitado
+- Boundary values min=100, max=599 aceito
+
+**runner.test.ts (4 testes)**:
+- Status 302 com successRange {200, 399} conta como sucesso
+- Status 302 com default {200, 299} conta como falha
+- Max boundary inclusive (299 = sucesso com range {200, 299})
+- Default successRange adicionado ao helper makeConfig
+
+**wizard.test.ts (2 novos + 15 atualizados)**:
+- Default sem customizar -> successRange nao incluido no YAML
+- Custom com min=200 max=399 -> successRange incluido no YAML
+- Todos 15 testes existentes atualizados com mock de confirm de successRange
+
 ## Handoff para Review
 
 ### O que mudou

@@ -14,6 +14,7 @@ function makeConfig(overrides: Partial<RepeaterConfig> = {}): RepeaterConfig {
     concurrency: 1,
     total: 1,
     timeoutMs: 5000,
+    successRange: { min: 200, max: 299 },
     ...overrides,
   };
 }
@@ -454,7 +455,7 @@ describe("RepeaterRunner", () => {
   });
 
   describe("summary calculation", () => {
-    it("should count only 2xx status as success", async () => {
+    it("should count only 2xx status as success with default successRange", async () => {
       let callIndex = 0;
       const statuses = [200, 201, 299, 300, 404, 500];
       const deps = makeDeps({
@@ -471,6 +472,63 @@ describe("RepeaterRunner", () => {
 
       expect(summary.successCount).toBe(3); // 200, 201, 299
       expect(summary.failureCount).toBe(3); // 300, 404, 500
+    });
+
+    it("should count status 302 as success when successRange is {200, 399}", async () => {
+      let callIndex = 0;
+      const statuses = [200, 302, 399, 400, 500];
+      const deps = makeDeps({
+        requestExecutor: {
+          execute: vi.fn().mockImplementation(() =>
+            Promise.resolve(makeResult({ status: statuses[callIndex++] }))
+          ),
+        },
+      });
+      const runner = new RepeaterRunner(deps);
+      const config = makeConfig({
+        total: 5,
+        concurrency: 1,
+        successRange: { min: 200, max: 399 },
+      });
+
+      const summary = await runner.execute(config);
+
+      expect(summary.successCount).toBe(3); // 200, 302, 399
+      expect(summary.failureCount).toBe(2); // 400, 500
+    });
+
+    it("should count status 302 as failure with default successRange {200, 299}", async () => {
+      const deps = makeDeps({
+        requestExecutor: {
+          execute: vi.fn().mockResolvedValue(makeResult({ status: 302 })),
+        },
+      });
+      const runner = new RepeaterRunner(deps);
+      const config = makeConfig({ total: 1, concurrency: 1 });
+
+      const summary = await runner.execute(config);
+
+      expect(summary.successCount).toBe(0);
+      expect(summary.failureCount).toBe(1);
+    });
+
+    it("should use inclusive range (max boundary is success)", async () => {
+      const deps = makeDeps({
+        requestExecutor: {
+          execute: vi.fn().mockResolvedValue(makeResult({ status: 299 })),
+        },
+      });
+      const runner = new RepeaterRunner(deps);
+      const config = makeConfig({
+        total: 1,
+        concurrency: 1,
+        successRange: { min: 200, max: 299 },
+      });
+
+      const summary = await runner.execute(config);
+
+      expect(summary.successCount).toBe(1);
+      expect(summary.failureCount).toBe(0);
     });
 
     it("should count status null (network error) as failure", async () => {

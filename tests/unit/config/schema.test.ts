@@ -275,4 +275,91 @@ describe("repeaterConfigSchema", () => {
       expect(result.total).toBe(10);
     });
   });
+
+  describe("successRange", () => {
+    it("should apply default successRange { min: 200, max: 299 } when not specified", () => {
+      const result = repeaterConfigSchema.parse({
+        method: "GET",
+        url: "https://api.acme.com/test",
+      });
+      expect(result.successRange).toEqual({ min: 200, max: 299 });
+    });
+
+    it("should accept a custom successRange", () => {
+      const result = repeaterConfigSchema.parse({
+        method: "GET",
+        url: "https://api.acme.com/test",
+        successRange: { min: 200, max: 399 },
+      });
+      expect(result.successRange).toEqual({ min: 200, max: 399 });
+    });
+
+    it("should accept successRange with min = max (single status)", () => {
+      const result = repeaterConfigSchema.parse({
+        method: "GET",
+        url: "https://api.acme.com/test",
+        successRange: { min: 200, max: 200 },
+      });
+      expect(result.successRange).toEqual({ min: 200, max: 200 });
+    });
+
+    it("should reject successRange where min > max", () => {
+      expect(() =>
+        repeaterConfigSchema.parse({
+          method: "GET",
+          url: "https://api.acme.com/test",
+          successRange: { min: 300, max: 200 },
+        })
+      ).toThrow();
+    });
+
+    it("should reject successRange with min < 100", () => {
+      expect(() =>
+        repeaterConfigSchema.parse({
+          method: "GET",
+          url: "https://api.acme.com/test",
+          successRange: { min: 99, max: 299 },
+        })
+      ).toThrow();
+    });
+
+    it("should reject successRange with max > 599", () => {
+      expect(() =>
+        repeaterConfigSchema.parse({
+          method: "GET",
+          url: "https://api.acme.com/test",
+          successRange: { min: 200, max: 600 },
+        })
+      ).toThrow();
+    });
+
+    it("should reject successRange with non-integer min", () => {
+      expect(() =>
+        repeaterConfigSchema.parse({
+          method: "GET",
+          url: "https://api.acme.com/test",
+          successRange: { min: 200.5, max: 299 },
+        })
+      ).toThrow();
+    });
+
+    it("should reject successRange with non-integer max", () => {
+      expect(() =>
+        repeaterConfigSchema.parse({
+          method: "GET",
+          url: "https://api.acme.com/test",
+          successRange: { min: 200, max: 299.5 },
+        })
+      ).toThrow();
+    });
+
+    it("should accept boundary values min=100 and max=599", () => {
+      const result = repeaterConfigSchema.parse({
+        method: "GET",
+        url: "https://api.acme.com/test",
+        successRange: { min: 100, max: 599 },
+      });
+      expect(result.successRange).toEqual({ min: 100, max: 599 });
+    });
+  });
 });

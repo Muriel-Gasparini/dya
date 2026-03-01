@@ -117,8 +117,8 @@ export class RepeaterRunner {
         totalRequests++;
         if (
           result.status !== null &&
-          result.status >= 200 &&
-          result.status < 300
+          result.status >= config.successRange.min &&
+          result.status <= config.successRange.max
         ) {
           successCount++;
         } else {

@@ -27,4 +27,6 @@ export interface RepeaterConfig {
   total: RequestTotal;
   /** Timeout por request em milissegundos */
   timeoutMs: number;
+  /** Range de status codes considerados sucesso (inclusive) */
+  successRange: { min: number; max: number };
 }
