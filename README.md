@@ -1,5 +1,10 @@
 # DYA - Destroy Your App
 
+![Statements](./badges/coverage-statements.svg)
+![Branches](./badges/coverage-branches.svg)
+![Functions](./badges/coverage-functions.svg)
+![Lines](./badges/coverage-lines.svg)
+
 CLI tool para disparar requests HTTP em massa com concorrencia configuravel, dados dinamicos via faker e configuracao via YAML.
 
 ## Instalacao

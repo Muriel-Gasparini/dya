@@ -1,12 +1,16 @@
 name: CI
 
 on:
+  push:
+    branches: [main]
   pull_request:
     branches: [main]
 
 jobs:
   lint-and-test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -22,3 +26,10 @@ jobs:
       - run: pnpm lint
 
       - run: pnpm test:coverage
+
+      - name: Generate coverage badges
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: jpb06/coverage-badges-action@latest
+        with:
+          coverage-summary-path: ./coverage/coverage-summary.json
+          branches: main
