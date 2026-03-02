@@ -3,7 +3,7 @@ import * as path from "node:path";
 import * as os from "node:os";
 import { execFile } from "node:child_process";
 
-import type { UpdateOptions } from "./types.js";
+import { type UpdateOptions, getAssetName } from "./types.js";
 
 /**
  * Downloads the new binary from a .tar.gz URL and performs atomic replacement.
@@ -58,7 +58,8 @@ export async function selfUpdate(options: UpdateOptions): Promise<void> {
     }
 
     // 3. Copy extracted binary to same dir as target (for same-fs rename)
-    const extractedBin = path.join(extractDir, "dya");
+    const binName = getAssetName().replace(/\.tar\.gz$/, "");
+    const extractedBin = path.join(extractDir, binName);
     try {
       await fs.copyFile(extractedBin, tmpBin);
     } catch (err) {

@@ -9,6 +9,9 @@ vi.mock("node:child_process", () => ({
 }));
 
 import { selfUpdate } from "../../../src/updater/self-updater.js";
+import { getAssetName } from "../../../src/updater/types.js";
+
+const EXTRACTED_BIN = getAssetName().replace(/\.tar\.gz$/, "");
 
 describe("selfUpdate", () => {
   let tmpDir: string;
@@ -48,7 +51,7 @@ describe("selfUpdate", () => {
             const extractDir = _args[cIndex + 1];
             // Create a fake extracted binary
             fs.mkdir(extractDir, { recursive: true }).then(() => {
-              fs.writeFile(path.join(extractDir, "dya"), "new-binary-content").then(() => {
+              fs.writeFile(path.join(extractDir, EXTRACTED_BIN), "new-binary-content").then(() => {
                 callback(null, "", "");
               });
             });
@@ -201,7 +204,7 @@ describe("selfUpdate", () => {
           if (cIndex !== -1) {
             const extractDir = _args[cIndex + 1];
             fs.mkdir(extractDir, { recursive: true }).then(() => {
-              fs.writeFile(path.join(extractDir, "dya"), "new-binary").then(() => {
+              fs.writeFile(path.join(extractDir, EXTRACTED_BIN), "new-binary").then(() => {
                 callback(null, "", "");
               });
             });
