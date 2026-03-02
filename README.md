@@ -5,14 +5,19 @@
 ![Functions](./badges/coverage-functions.svg)
 ![Lines](./badges/coverage-lines.svg)
 
-CLI tool para disparar requests HTTP em massa com concorrencia configuravel, dados dinamicos via faker e configuracao via YAML.
+CLI tool for mass HTTP request dispatching with configurable concurrency, dynamic data via faker, and YAML-based configuration.
 
-## Instalacao
+## Installation
 
-Requisitos:
+```bash
+curl -fsSL https://raw.githubusercontent.com/Muriel-Gasparini/dya/main/install.sh | sh
+```
 
-- Node.js >= 20
-- pnpm
+This installs the `dya` binary to `~/.local/bin`. No Node.js required.
+
+### From source
+
+Requirements: Node.js >= 20, pnpm
 
 ```bash
 pnpm install
@@ -20,30 +25,36 @@ pnpm build
 pnpm link --global
 ```
 
-## Uso
+## Usage
 
-### Criar configuracao via wizard
+### Create config via interactive wizard
 
 ```bash
 dya init
-dya init -o minha-config.yaml
+dya init -o my-config.yaml
 ```
 
-### Executar requests
+### Run requests
 
 ```bash
 dya run config.yaml
 ```
 
-### Ajuda
+### Update to latest version
+
+```bash
+dya update
+```
+
+### Help
 
 ```bash
 dya --help
 ```
 
-## Configuracao YAML
+## YAML Configuration
 
-Exemplo completo com todos os campos:
+Full example with all fields:
 
 ```yaml
 method: POST
@@ -67,35 +78,35 @@ successRange:
   max: 299
 ```
 
-### Campos
+### Fields
 
-| Campo | Tipo | Default | Descricao |
-|-------|------|---------|-----------|
-| method | string | (obrigatorio) | Metodo HTTP: GET, POST, PUT, PATCH, DELETE |
-| url | string | (obrigatorio) | URL completa do endpoint |
-| headers | map | {} | Headers HTTP como chave-valor |
-| bodyType | string | none | Tipo do body: json, formdata, urlencoded, none |
-| body | map | {} | Campos do body como chave-valor |
-| queryParams | map | {} | Query parameters como chave-valor |
-| concurrency | number | 1 | Numero de requests simultaneas |
-| total | number ou "infinite" | 1 | Total de requests a disparar |
-| timeoutMs | number | 5000 | Timeout por request em milissegundos |
-| successRange | object | {min: 200, max: 299} | Range de status codes considerados sucesso |
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| method | string | (required) | HTTP method: GET, POST, PUT, PATCH, DELETE |
+| url | string | (required) | Full endpoint URL |
+| headers | map | {} | HTTP headers as key-value pairs |
+| bodyType | string | none | Body type: json, formdata, urlencoded, none |
+| body | map | {} | Body fields as key-value pairs |
+| queryParams | map | {} | Query parameters as key-value pairs |
+| concurrency | number | 1 | Number of concurrent requests |
+| total | number or "infinite" | 1 | Total requests to send |
+| timeoutMs | number | 5000 | Per-request timeout in milliseconds |
+| successRange | object | {min: 200, max: 299} | Status code range considered success |
 
 ## Body Types
 
-- **json** - Envia o body como `application/json`
-- **urlencoded** - Envia o body como `application/x-www-form-urlencoded`
-- **formdata** - Envia o body como `multipart/form-data`
-- **none** - Sem body (usado para GET, DELETE)
+- **json** - Sends body as `application/json`
+- **urlencoded** - Sends body as `application/x-www-form-urlencoded`
+- **formdata** - Sends body as `multipart/form-data`
+- **none** - No body (used for GET, DELETE)
 
-## Templates Faker
+## Faker Templates
 
-Valores no body, headers e query params podem usar templates faker para gerar dados dinamicos.
+Values in body, headers, and query params can use faker templates to generate dynamic data per request.
 
-Sintaxe: `{{faker.module.method}}`
+Syntax: `{{faker.module.method}}`
 
-Exemplos:
+Examples:
 
 ```yaml
 body:
@@ -108,11 +119,11 @@ body:
   code: "{{faker.string.numeric(6)}}"
 ```
 
-Cada request gera valores diferentes, permitindo criar dados realistas e variados automaticamente.
+Each request generates different values, allowing you to create realistic and varied data automatically.
 
 ## Success Range
 
-Por default, status codes entre 200 e 299 sao considerados sucesso. Para customizar, adicione o campo `successRange` no YAML:
+By default, status codes between 200 and 299 are considered success. To customize, add the `successRange` field to your YAML:
 
 ```yaml
 successRange:
@@ -120,18 +131,18 @@ successRange:
   max: 399
 ```
 
-Neste exemplo, qualquer resposta com status entre 200 e 399 (inclusive) sera contada como sucesso. O campo `min` deve ser menor ou igual a `max`, e ambos devem estar entre 100 e 599.
+In this example, any response with status between 200 and 399 (inclusive) is counted as success. `min` must be less than or equal to `max`, and both must be between 100 and 599.
 
-## Exemplos
+## Examples
 
-### Criar usuarios via POST com dados faker
+### Create users via POST with faker data
 
 ```yaml
 method: POST
 url: https://api.example.com/users
 headers:
   Content-Type: application/json
-  Authorization: Bearer meu-token
+  Authorization: Bearer my-token
 bodyType: json
 body:
   name: "{{faker.person.fullName}}"
@@ -141,7 +152,7 @@ total: 100
 timeoutMs: 5000
 ```
 
-### Health check GET com alta concorrencia
+### High-concurrency GET health check
 
 ```yaml
 method: GET
@@ -151,7 +162,7 @@ total: 1000
 timeoutMs: 3000
 ```
 
-### Envio de formulario urlencoded
+### Urlencoded form submission
 
 ```yaml
 method: POST
@@ -164,15 +175,15 @@ concurrency: 3
 total: 10
 ```
 
-## Desenvolvimento
+## Development
 
 ```bash
-# Rodar testes
-pnpm test
-
-# Build
-pnpm build
-
-# Testes com cobertura
-pnpm test:coverage
+pnpm test            # Run tests
+pnpm build           # Build
+pnpm test:coverage   # Tests with coverage
+pnpm lint            # Type check
 ```
+
+## License
+
+Apache-2.0
