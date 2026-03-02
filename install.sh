@@ -74,8 +74,9 @@ fi
 
 tar xzf "$TMP/$ASSET" -C "$TMP"
 
+BIN_NAME="dya-${OS}-${ARCH}"
 mkdir -p "$INSTALL_DIR"
-mv "$TMP/dya" "$INSTALL_DIR/dya"
+mv "$TMP/$BIN_NAME" "$INSTALL_DIR/dya"
 chmod +x "$INSTALL_DIR/dya"
 
 # Check PATH
