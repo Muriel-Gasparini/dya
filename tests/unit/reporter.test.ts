@@ -57,7 +57,7 @@ describe("ConsoleReporter", () => {
         url: "https://api.example.com/register",
         status: null,
         durationMs: 5000,
-        error: "Timeout de 5000ms excedido",
+        error: "Timeout of 5000ms exceeded",
       };
 
       reporter.reportResult(result, 50);

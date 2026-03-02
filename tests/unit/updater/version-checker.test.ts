@@ -482,7 +482,7 @@ describe("checkAndNotify", () => {
     ]);
 
     const mockRl = {
-      question: vi.fn().mockResolvedValue("s"),
+      question: vi.fn().mockResolvedValue("y"),
       close: vi.fn(),
     };
     vi.mocked(createInterface).mockReturnValue(mockRl as any);
@@ -589,7 +589,7 @@ describe("checkAndNotify", () => {
 
     expect(selfUpdate).not.toHaveBeenCalled();
     expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining("sem binario para sua plataforma"),
+      expect.stringContaining("no binary for your platform"),
     );
 
     consoleSpy.mockRestore();

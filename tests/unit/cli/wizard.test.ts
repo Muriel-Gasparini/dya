@@ -232,7 +232,7 @@ describe("wizardCommand", () => {
     // Check that preview was shown (console.log called with preview markers)
     const calls = stdoutSpy.mock.calls.map((c) => String(c[0]));
     const hasPreviewStart = calls.some((c) => c.includes("--- Preview ---"));
-    const hasPreviewEnd = calls.some((c) => c.includes("--- Fim ---"));
+    const hasPreviewEnd = calls.some((c) => c.includes("--- End ---"));
     expect(hasPreviewStart).toBe(true);
     expect(hasPreviewEnd).toBe(true);
   });
@@ -400,7 +400,7 @@ describe("wizardCommand", () => {
     expect(content).toContain("bodyType: formdata");
   });
 
-  it("prints 'Configuracao descartada.' when user rejects save", async () => {
+  it("prints 'Config discarded.' when user rejects save", async () => {
     // method
     mockSelect.mockResolvedValueOnce("GET");
     // url
@@ -424,7 +424,7 @@ describe("wizardCommand", () => {
 
     const calls = stdoutSpy.mock.calls.map((c) => String(c[0]));
     const hasDiscarded = calls.some((c) =>
-      c.includes("Configuracao descartada."),
+      c.includes("Config discarded."),
     );
     expect(hasDiscarded).toBe(true);
   });
@@ -594,19 +594,19 @@ describe("validateUrl", () => {
   it("returns error string for an invalid URL", () => {
     const result = validateUrl("not-a-url");
     expect(typeof result).toBe("string");
-    expect(result).toContain("URL invalida");
+    expect(result).toContain("Invalid URL");
   });
 
   it("returns error string for empty string", () => {
     const result = validateUrl("");
     expect(typeof result).toBe("string");
-    expect(result).toContain("URL invalida");
+    expect(result).toContain("Invalid URL");
   });
 
   it("returns error string for URL without protocol", () => {
     const result = validateUrl("api.example.com/users");
     expect(typeof result).toBe("string");
-    expect(result).toContain("URL invalida");
+    expect(result).toContain("Invalid URL");
   });
 });
 
@@ -626,30 +626,30 @@ describe("validateTotal", () => {
   it("returns error string for '0'", () => {
     const result = validateTotal("0");
     expect(typeof result).toBe("string");
-    expect(result).toContain("numero inteiro positivo");
+    expect(result).toContain("positive integer");
   });
 
   it("returns error string for negative number", () => {
     const result = validateTotal("-5");
     expect(typeof result).toBe("string");
-    expect(result).toContain("numero inteiro positivo");
+    expect(result).toContain("positive integer");
   });
 
   it("returns error string for decimal number", () => {
     const result = validateTotal("3.5");
     expect(typeof result).toBe("string");
-    expect(result).toContain("numero inteiro positivo");
+    expect(result).toContain("positive integer");
   });
 
   it("returns error string for non-numeric string", () => {
     const result = validateTotal("abc");
     expect(typeof result).toBe("string");
-    expect(result).toContain("numero inteiro positivo");
+    expect(result).toContain("positive integer");
   });
 
   it("returns error string for empty string", () => {
     const result = validateTotal("");
     expect(typeof result).toBe("string");
-    expect(result).toContain("numero inteiro positivo");
+    expect(result).toContain("positive integer");
   });
 });

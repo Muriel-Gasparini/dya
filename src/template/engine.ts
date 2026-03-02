@@ -38,7 +38,7 @@ function navigateFakerPath(fakerPath: string): unknown {
     current = current[part];
     if (current === undefined) {
       throw new TemplateError(
-        `Template invalido: faker.${fakerPath} nao existe`,
+        `Invalid template: faker.${fakerPath} does not exist`,
       );
     }
   }
@@ -59,7 +59,7 @@ export class FakerTemplateEngine {
 
         if (typeof target !== "function") {
           throw new TemplateError(
-            `faker.${fakerPath} nao e um metodo (e ${typeof target})`,
+            `faker.${fakerPath} is not a method (is ${typeof target})`,
           );
         }
 
@@ -97,7 +97,7 @@ export class FakerTemplateEngine {
         const target = navigateFakerPath(fakerPath);
         if (typeof target !== "function") {
           throw new TemplateError(
-            `faker.${fakerPath} nao e um metodo (e ${typeof target})`,
+            `faker.${fakerPath} is not a method (is ${typeof target})`,
           );
         }
       }

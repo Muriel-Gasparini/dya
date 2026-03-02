@@ -38,20 +38,20 @@ export class UndiciHttpClient implements HttpClient {
     } catch (error: unknown) {
       if (error instanceof Error) {
         if (error.name === "AbortError") {
-          throw new Error(`Timeout de ${options.timeoutMs}ms excedido`);
+          throw new Error(`Timeout of ${options.timeoutMs}ms exceeded`);
         }
 
         const code = (error as NodeJS.ErrnoException).code;
 
         if (code === "ECONNREFUSED") {
           throw new Error(
-            `Conexao recusada (ECONNREFUSED): ${error.message}`,
+            `Connection refused (ECONNREFUSED): ${error.message}`,
           );
         }
 
         if (code === "ENOTFOUND") {
           throw new Error(
-            `Host nao encontrado (ENOTFOUND): ${error.message}`,
+            `Host not found (ENOTFOUND): ${error.message}`,
           );
         }
       }

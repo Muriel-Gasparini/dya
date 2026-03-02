@@ -106,7 +106,7 @@ describe("FakerTemplateEngine", () => {
       ).toThrow(TemplateError);
       expect(() =>
         engine.resolve("{{faker.rawDefinitions.airline}}"),
-      ).toThrow(/nao e um metodo/);
+      ).toThrow(/is not a method/);
     });
 
     it("should handle unquoted non-numeric non-boolean argument (fallback branch)", () => {
@@ -213,7 +213,7 @@ describe("FakerTemplateEngine", () => {
         bad: "{{faker.rawDefinitions.airline}}",
       };
       expect(() => engine.validateRecord(fields)).toThrow(TemplateError);
-      expect(() => engine.validateRecord(fields)).toThrow(/nao e um metodo/);
+      expect(() => engine.validateRecord(fields)).toThrow(/is not a method/);
     });
 
     it("should validate mixed record with both valid templates and plain text", () => {

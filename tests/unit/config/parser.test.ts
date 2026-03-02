@@ -82,7 +82,7 @@ describe("parseConfig", () => {
 
       await expect(parseConfig(nonExistentPath)).rejects.toThrow(ConfigError);
       await expect(parseConfig(nonExistentPath)).rejects.toThrow(
-        /Arquivo nao encontrado/
+        /File not found/
       );
       await expect(parseConfig(nonExistentPath)).rejects.toThrow(
         nonExistentPath
@@ -120,11 +120,11 @@ describe("parseConfig", () => {
 
       await expect(parseConfig(invalidConfigPath)).rejects.toThrow(ConfigError);
       await expect(parseConfig(invalidConfigPath)).rejects.toThrow(
-        /Configuracao invalida/
+        /Invalid config/
       );
     });
 
-    it("should throw ConfigError with 'Sem permissao de leitura' when file is not readable (EACCES)", async () => {
+    it("should throw ConfigError with 'Permission denied' when file is not readable (EACCES)", async () => {
       let tmpDir: string | undefined;
       try {
         tmpDir = await mkdtemp(join(tmpdir(), "repeater-test-"));
@@ -134,7 +134,7 @@ describe("parseConfig", () => {
 
         await expect(parseConfig(noReadPath)).rejects.toThrow(ConfigError);
         await expect(parseConfig(noReadPath)).rejects.toThrow(
-          /Sem permissao de leitura/
+          /Permission denied/
         );
       } finally {
         if (tmpDir) await rm(tmpDir, { recursive: true, force: true });
@@ -150,7 +150,7 @@ describe("parseConfig", () => {
 
         await expect(parseConfig(scalarPath)).rejects.toThrow(ConfigError);
         await expect(parseConfig(scalarPath)).rejects.toThrow(
-          /Configuracao vazia ou invalida/
+          /Empty or invalid config/
         );
       } finally {
         if (tmpDir) await rm(tmpDir, { recursive: true });
@@ -166,7 +166,7 @@ describe("parseConfig", () => {
 
         await expect(parseConfig(numberPath)).rejects.toThrow(ConfigError);
         await expect(parseConfig(numberPath)).rejects.toThrow(
-          /Configuracao vazia ou invalida/
+          /Empty or invalid config/
         );
       } finally {
         if (tmpDir) await rm(tmpDir, { recursive: true });
@@ -180,7 +180,7 @@ describe("parseConfig", () => {
         // Trying to read a directory as a file triggers EISDIR
         await expect(parseConfig(tmpDir)).rejects.toThrow(ConfigError);
         await expect(parseConfig(tmpDir)).rejects.toThrow(
-          /Erro ao ler arquivo/
+          /Failed to read file/
         );
       } finally {
         if (tmpDir) await rm(tmpDir, { recursive: true });

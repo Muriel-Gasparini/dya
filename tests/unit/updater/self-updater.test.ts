@@ -100,7 +100,7 @@ describe("selfUpdate", () => {
     expect(content).toBe("new-binary-content");
 
     // Verify success message
-    expect(consoleSpy).toHaveBeenCalledWith("Atualizado para v0.2.0");
+    expect(consoleSpy).toHaveBeenCalledWith("Updated to v0.2.0");
 
     consoleSpy.mockRestore();
   });
@@ -158,7 +158,7 @@ describe("selfUpdate", () => {
         targetPath,
         targetVersion: "0.2.0",
       }),
-    ).rejects.toThrow("Falha no download");
+    ).rejects.toThrow("Download failed");
   });
 
   it("should throw on non-200 HTTP response", async () => {
@@ -174,7 +174,7 @@ describe("selfUpdate", () => {
         targetPath,
         targetVersion: "0.2.0",
       }),
-    ).rejects.toThrow("Falha no download");
+    ).rejects.toThrow("Download failed");
   });
 
   it("should throw on tar extraction failure", async () => {
@@ -187,7 +187,7 @@ describe("selfUpdate", () => {
         targetPath,
         targetVersion: "0.2.0",
       }),
-    ).rejects.toThrow("Falha ao extrair o pacote");
+    ).rejects.toThrow("Failed to extract package");
   });
 
   it("should throw on permission denied (EACCES on rename)", async () => {

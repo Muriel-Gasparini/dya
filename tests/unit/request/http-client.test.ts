@@ -131,7 +131,7 @@ describe("UndiciHttpClient", () => {
       };
 
       await expect(client.execute(options)).rejects.toThrow(
-        "Timeout de 3000ms excedido",
+        "Timeout of 3000ms exceeded",
       );
     });
 
@@ -149,7 +149,7 @@ describe("UndiciHttpClient", () => {
       };
 
       await expect(client.execute(options)).rejects.toThrow(
-        "Timeout de 10000ms excedido",
+        "Timeout of 10000ms exceeded",
       );
     });
   });
@@ -170,7 +170,7 @@ describe("UndiciHttpClient", () => {
 
       await expect(client.execute(options)).rejects.toThrow("ECONNREFUSED");
       await expect(client.execute(options)).rejects.toThrow(
-        /[Cc]onex[aã]o recusada/,
+        /Connection refused/,
       );
     });
 
@@ -191,7 +191,7 @@ describe("UndiciHttpClient", () => {
 
       await expect(client.execute(options)).rejects.toThrow("ENOTFOUND");
       await expect(client.execute(options)).rejects.toThrow(
-        /[Dd]NS|[Hh]ost.*n[aã]o encontrado/,
+        /Host not found/,
       );
     });
 

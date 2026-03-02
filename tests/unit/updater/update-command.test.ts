@@ -46,9 +46,9 @@ describe("updateCommand", () => {
 
     await updateCommand();
 
-    expect(consoleSpy).toHaveBeenCalledWith("Verificando atualizacoes...");
+    expect(consoleSpy).toHaveBeenCalledWith("Checking for updates...");
     expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining("Nova versao v0.2.0 encontrada"),
+      expect.stringContaining("New version v0.2.0 found"),
     );
     expect(selfUpdate).toHaveBeenCalledWith({
       downloadUrl:
@@ -69,7 +69,7 @@ describe("updateCommand", () => {
     await updateCommand();
 
     expect(consoleSpy).toHaveBeenCalledWith(
-      "Voce ja esta na versao mais recente (v0.1.0)",
+      "You are already on the latest version (v0.1.0)",
     );
     expect(selfUpdate).not.toHaveBeenCalled();
   });
@@ -80,7 +80,7 @@ describe("updateCommand", () => {
     await updateCommand();
 
     expect(consoleSpy).toHaveBeenCalledWith(
-      "Nao foi possivel verificar atualizacoes. Verifique sua conexao.",
+      "Could not check for updates. Check your connection.",
     );
     expect(selfUpdate).not.toHaveBeenCalled();
   });
@@ -96,7 +96,7 @@ describe("updateCommand", () => {
     await updateCommand();
 
     expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining("sem binario para sua plataforma"),
+      expect.stringContaining("no binary for your platform"),
     );
     expect(selfUpdate).not.toHaveBeenCalled();
   });
@@ -109,13 +109,13 @@ describe("updateCommand", () => {
       downloadUrl: "https://example.com/dya.tar.gz",
     });
     vi.mocked(selfUpdate).mockRejectedValue(
-      new Error("Falha no download: Network error"),
+      new Error("Download failed: Network error"),
     );
 
     await updateCommand();
 
     expect(consoleErrSpy).toHaveBeenCalledWith(
-      expect.stringContaining("Falha no download"),
+      expect.stringContaining("Download failed"),
     );
     expect(processExitSpy).toHaveBeenCalledWith(1);
   });

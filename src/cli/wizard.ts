@@ -11,7 +11,7 @@ export function validateUrl(value: string): true | string {
     new URL(value);
     return true;
   } catch {
-    return "URL invalida. Informe uma URL completa (ex: https://api.example.com/endpoint)";
+    return "Invalid URL. Provide a full URL (e.g. https://api.example.com/endpoint)";
   }
 }
 
@@ -19,7 +19,7 @@ export function validateTotal(value: string): true | string {
   if (value === "infinite") return true;
   const num = Number(value);
   if (Number.isNaN(num) || !Number.isInteger(num) || num < 1) {
-    return 'Informe um numero inteiro positivo ou "infinite"';
+    return 'Enter a positive integer or "infinite"';
   }
   return true;
 }
@@ -27,7 +27,7 @@ export function validateTotal(value: string): true | string {
 export async function wizardCommand(options: WizardOptions): Promise<void> {
   // 1. Method
   const method = await select({
-    message: "Metodo HTTP:",
+    message: "HTTP method:",
     choices: [
       { value: "GET" },
       { value: "POST" },
@@ -39,13 +39,13 @@ export async function wizardCommand(options: WizardOptions): Promise<void> {
 
   // 2. URL
   const url = await input({
-    message: "URL do endpoint:",
+    message: "Endpoint URL:",
     validate: validateUrl,
   });
 
   // 3. Headers (loop)
   const headers: Record<string, string> = {};
-  while (await confirm({ message: "Adicionar header?" })) {
+  while (await confirm({ message: "Add header?" })) {
     const key = await input({ message: "Header key:" });
     const value = await input({ message: "Header value:" });
     headers[key] = value;
@@ -56,12 +56,12 @@ export async function wizardCommand(options: WizardOptions): Promise<void> {
   let bodyType: string = "none";
   if (methodsWithBody.includes(method)) {
     bodyType = await select({
-      message: "Tipo do body:",
+      message: "Body type:",
       choices: [
         { value: "json", name: "JSON" },
         { value: "formdata", name: "FormData" },
         { value: "urlencoded", name: "urlencoded (application/x-www-form-urlencoded)" },
-        { value: "none", name: "Nenhum" },
+        { value: "none", name: "None" },
       ],
     });
   }
@@ -72,18 +72,18 @@ export async function wizardCommand(options: WizardOptions): Promise<void> {
     while (
       await confirm({
         message:
-          "Adicionar campo ao body? (use {{faker.module.method}} para dados dinamicos)",
+          "Add body field? (use {{faker.module.method}} for dynamic data)",
       })
     ) {
-      const key = await input({ message: "Campo key:" });
-      const value = await input({ message: "Campo value:" });
+      const key = await input({ message: "Field key:" });
+      const value = await input({ message: "Field value:" });
       body[key] = value;
     }
   }
 
   // 6. Query params (loop)
   const queryParams: Record<string, string> = {};
-  while (await confirm({ message: "Adicionar query parameter?" })) {
+  while (await confirm({ message: "Add query parameter?" })) {
     const key = await input({ message: "Query param key:" });
     const value = await input({ message: "Query param value:" });
     queryParams[key] = value;
@@ -91,14 +91,14 @@ export async function wizardCommand(options: WizardOptions): Promise<void> {
 
   // 7. Concurrency
   let concurrency = (await number({
-    message: "Concorrencia (requests simultaneas):",
+    message: "Concurrency (simultaneous requests):",
     default: 1,
     min: 1,
   })) as number;
 
   // 8. Total
   const totalRaw = await input({
-    message: 'Total de requests (numero ou "infinite"):',
+    message: 'Total requests (number or "infinite"):',
     default: "1",
     validate: validateTotal,
   });
@@ -112,26 +112,26 @@ export async function wizardCommand(options: WizardOptions): Promise<void> {
 
   // 9. Timeout
   const timeoutMs = (await number({
-    message: "Timeout por request (ms):",
+    message: "Timeout per request (ms):",
     default: 5000,
     min: 100,
   })) as number;
 
   // 10. Success range (optional)
   const customizeSuccessRange = await confirm({
-    message: "Customizar range de sucesso? (default: 200-299)",
+    message: "Customize success range? (default: 200-299)",
   });
 
   let successRange: { min: number; max: number } | undefined;
   if (customizeSuccessRange) {
     const srMin = (await number({
-      message: "Status code minimo (sucesso):",
+      message: "Minimum status code (success):",
       default: 200,
       min: 100,
       max: 599,
     })) as number;
     const srMax = (await number({
-      message: "Status code maximo (sucesso):",
+      message: "Maximum status code (success):",
       default: 299,
       min: 100,
       max: 599,
@@ -160,17 +160,17 @@ export async function wizardCommand(options: WizardOptions): Promise<void> {
   const yamlString = stringify(config);
   console.log("--- Preview ---");
   console.log(yamlString);
-  console.log("--- Fim ---");
+  console.log("--- End ---");
 
   // 11. Confirmation
   const shouldSave = await confirm({
-    message: `Salvar em ${options.output}?`,
+    message: `Save to ${options.output}?`,
   });
 
   if (shouldSave) {
     await writeFile(options.output, yamlString, "utf-8");
-    console.log(`Configuracao salva em ${options.output}`);
+    console.log(`Config saved to ${options.output}`);
   } else {
-    console.log("Configuracao descartada.");
+    console.log("Config discarded.");
   }
 }

@@ -33,13 +33,13 @@ export async function selfUpdate(options: UpdateOptions): Promise<void> {
       response = await globalThis.fetch(downloadUrl);
     } catch (err) {
       throw new Error(
-        `Falha no download: ${err instanceof Error ? err.message : String(err)}`,
+        `Download failed: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
 
     if (!response.ok) {
       throw new Error(
-        `Falha no download: HTTP ${response.status} ${response.statusText}`,
+        `Download failed: HTTP ${response.status} ${response.statusText}`,
       );
     }
 
@@ -53,7 +53,7 @@ export async function selfUpdate(options: UpdateOptions): Promise<void> {
       await execFileAsync("tar", ["xzf", tmpTar, "-C", extractDir]);
     } catch (err) {
       throw new Error(
-        `Falha ao extrair o pacote: ${err instanceof Error ? err.message : String(err)}`,
+        `Failed to extract package: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
 
@@ -65,7 +65,7 @@ export async function selfUpdate(options: UpdateOptions): Promise<void> {
       const code = (err as NodeJS.ErrnoException).code;
       if (code === "EACCES" || code === "EPERM") {
         throw new Error(
-          "Sem permissao para atualizar. Rode com permissoes adequadas ou mova o binario para ~/.local/bin",
+          "Permission denied. Run with appropriate permissions or move the binary to ~/.local/bin",
         );
       }
       throw err;
@@ -78,7 +78,7 @@ export async function selfUpdate(options: UpdateOptions): Promise<void> {
       const code = (err as NodeJS.ErrnoException).code;
       if (code === "EACCES" || code === "EPERM") {
         throw new Error(
-          "Sem permissao para atualizar. Rode com permissoes adequadas ou mova o binario para ~/.local/bin",
+          "Permission denied. Run with appropriate permissions or move the binary to ~/.local/bin",
         );
       }
       throw err;
@@ -87,7 +87,7 @@ export async function selfUpdate(options: UpdateOptions): Promise<void> {
     // 5. Ensure executable
     await fs.chmod(targetPath, 0o755);
 
-    console.log(`Atualizado para v${targetVersion}`);
+    console.log(`Updated to v${targetVersion}`);
   } finally {
     // 6. Cleanup
     await safeUnlink(tmpTar);

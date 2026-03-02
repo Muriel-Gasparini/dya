@@ -179,7 +179,7 @@ describe("RequestExecutor", () => {
   describe("execute - timeout handling", () => {
     it("should return RequestResult with status null and error containing timeout message", async () => {
       vi.mocked(mockHttpClient.execute).mockRejectedValue(
-        new Error("Timeout de 5000ms excedido"),
+        new Error("Timeout of 5000ms exceeded"),
       );
 
       const result = await executor.execute({
@@ -197,7 +197,7 @@ describe("RequestExecutor", () => {
 
     it("should return positive durationMs on timeout", async () => {
       vi.mocked(mockHttpClient.execute).mockRejectedValue(
-        new Error("Timeout de 3000ms excedido"),
+        new Error("Timeout of 3000ms exceeded"),
       );
 
       const result = await executor.execute({
@@ -214,7 +214,7 @@ describe("RequestExecutor", () => {
 
     it("should propagate index and method on timeout", async () => {
       vi.mocked(mockHttpClient.execute).mockRejectedValue(
-        new Error("Timeout de 5000ms excedido"),
+        new Error("Timeout of 5000ms exceeded"),
       );
 
       const result = await executor.execute({
@@ -235,7 +235,7 @@ describe("RequestExecutor", () => {
   describe("execute - network error handling", () => {
     it("should return RequestResult with status null and error message for ECONNREFUSED", async () => {
       vi.mocked(mockHttpClient.execute).mockRejectedValue(
-        new Error("Conexao recusada (ECONNREFUSED): connect ECONNREFUSED 127.0.0.1:3000"),
+        new Error("Connection refused (ECONNREFUSED): connect ECONNREFUSED 127.0.0.1:3000"),
       );
 
       const result = await executor.execute({
@@ -253,7 +253,7 @@ describe("RequestExecutor", () => {
 
     it("should return RequestResult with error message for ENOTFOUND (DNS error)", async () => {
       vi.mocked(mockHttpClient.execute).mockRejectedValue(
-        new Error("Host nao encontrado (ENOTFOUND): getaddrinfo ENOTFOUND api.naoexiste.com"),
+        new Error("Host not found (ENOTFOUND): getaddrinfo ENOTFOUND api.naoexiste.com"),
       );
 
       const result = await executor.execute({
@@ -271,7 +271,7 @@ describe("RequestExecutor", () => {
 
     it("should return positive durationMs on network error", async () => {
       vi.mocked(mockHttpClient.execute).mockRejectedValue(
-        new Error("Conexao recusada (ECONNREFUSED): connect ECONNREFUSED 127.0.0.1:3000"),
+        new Error("Connection refused (ECONNREFUSED): connect ECONNREFUSED 127.0.0.1:3000"),
       );
 
       const result = await executor.execute({

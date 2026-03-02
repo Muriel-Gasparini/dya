@@ -110,13 +110,13 @@ describe("runCommand", () => {
 
   it("ConfigError: prints message to stderr and exits with code 1", async () => {
     mockParseConfig.mockRejectedValue(
-      new ConfigError("Arquivo nao encontrado: config.yaml"),
+      new ConfigError("File not found: config.yaml"),
     );
 
     await runCommand("config.yaml");
 
     expect(stderrSpy).toHaveBeenCalledWith(
-      "Error: Arquivo nao encontrado: config.yaml",
+      "Error: File not found: config.yaml",
     );
     expect(exitSpy).toHaveBeenCalledWith(1);
   });
@@ -125,14 +125,14 @@ describe("runCommand", () => {
     mockParseConfig.mockResolvedValue(validConfig);
     mockValidateRecord.mockImplementation(() => {
       throw new TemplateError(
-        "Template invalido: faker.naoExiste.metodo nao existe",
+        "Invalid template: faker.naoExiste.metodo does not exist",
       );
     });
 
     await runCommand("config.yaml");
 
     expect(stderrSpy).toHaveBeenCalledWith(
-      "Error: Template invalido: faker.naoExiste.metodo nao existe",
+      "Error: Invalid template: faker.naoExiste.metodo does not exist",
     );
     expect(exitSpy).toHaveBeenCalledWith(1);
   });

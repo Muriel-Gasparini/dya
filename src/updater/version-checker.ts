@@ -154,7 +154,7 @@ export async function checkAndNotify(options: CheckOptions): Promise<void> {
 
     if (result.downloadUrl === null) {
       console.log(
-        `Nova versao v${result.latestVersion} disponivel mas sem binario para sua plataforma. Baixe manualmente em https://github.com/${options.owner ?? DEFAULT_OWNER}/${options.repo ?? DEFAULT_REPO}/releases/latest`,
+        `New version v${result.latestVersion} available but no binary for your platform. Download manually at https://github.com/${options.owner ?? DEFAULT_OWNER}/${options.repo ?? DEFAULT_REPO}/releases/latest`,
       );
       return;
     }
@@ -167,11 +167,11 @@ export async function checkAndNotify(options: CheckOptions): Promise<void> {
 
     try {
       const answer = await rl.question(
-        `Nova versao v${result.latestVersion} disponivel. Atualizar? [s/N] `,
+        `New version v${result.latestVersion} available. Update? [y/N]`,
       );
       rl.close();
 
-      if (answer.toLowerCase() === "s") {
+      if (answer.toLowerCase() === "y") {
         await selfUpdate({
           downloadUrl: result.downloadUrl,
           targetPath: process.execPath,

@@ -11,11 +11,11 @@ import type { RepeaterConfig } from "./types.js";
 function fileErrorMessage(code: string | undefined, filePath: string): string {
   switch (code) {
     case "ENOENT":
-      return `Arquivo nao encontrado: ${filePath}`;
+      return `File not found: ${filePath}`;
     case "EACCES":
-      return `Sem permissao de leitura: ${filePath}`;
+      return `Permission denied: ${filePath}`;
     default:
-      return `Erro ao ler arquivo: ${filePath}`;
+      return `Failed to read file: ${filePath}`;
   }
 }
 
@@ -26,7 +26,7 @@ function formatZodError(error: ZodError, filePath: string): string {
   const details = error.issues
     .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
     .join("; ");
-  return `Configuracao invalida em ${filePath}: ${details}`;
+  return `Invalid config in ${filePath}: ${details}`;
 }
 
 /**
@@ -58,14 +58,14 @@ export async function parseConfig(filePath: string): Promise<RepeaterConfig> {
     const detail =
       error instanceof Error ? error.message : String(error);
     throw new ConfigError(
-      `YAML invalido em ${filePath}: ${detail}`
+      `Invalid YAML in ${filePath}: ${detail}`
     );
   }
 
   // 3. Handle empty file (YAML.parse returns null for empty input)
   if (parsed == null || typeof parsed !== "object") {
     throw new ConfigError(
-      `Configuracao vazia ou invalida em ${filePath}`
+      `Empty or invalid config in ${filePath}`
     );
   }
 
@@ -77,7 +77,7 @@ export async function parseConfig(filePath: string): Promise<RepeaterConfig> {
     throw new ConfigError(
       error instanceof ZodError
         ? formatZodError(error, filePath)
-        : `Erro de validacao em ${filePath}`
+        : `Validation error in ${filePath}`
     );
   }
 }

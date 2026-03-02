@@ -9,7 +9,7 @@ import pkg from "../../package.json" with { type: "json" };
  * - If offline: shows error
  */
 export async function updateCommand(): Promise<void> {
-  console.log("Verificando atualizacoes...");
+  console.log("Checking for updates...");
 
   const result = await checkForUpdate({
     currentVersion: pkg.version,
@@ -18,27 +18,27 @@ export async function updateCommand(): Promise<void> {
 
   if (result === null) {
     console.log(
-      "Nao foi possivel verificar atualizacoes. Verifique sua conexao.",
+      "Could not check for updates. Check your connection.",
     );
     return;
   }
 
   if (!result.updateAvailable) {
     console.log(
-      `Voce ja esta na versao mais recente (v${result.currentVersion})`,
+      `You are already on the latest version (v${result.currentVersion})`,
     );
     return;
   }
 
   if (result.downloadUrl === null) {
     console.log(
-      `Nova versao v${result.latestVersion} disponivel mas sem binario para sua plataforma. Baixe manualmente em https://github.com/Muriel-Gasparini/dya/releases/latest`,
+      `New version v${result.latestVersion} available but no binary for your platform. Download manually at https://github.com/Muriel-Gasparini/dya/releases/latest`,
     );
     return;
   }
 
   console.log(
-    `Nova versao v${result.latestVersion} encontrada. Baixando...`,
+    `New version v${result.latestVersion} found. Downloading...`,
   );
 
   try {
@@ -49,7 +49,7 @@ export async function updateCommand(): Promise<void> {
     });
   } catch (err) {
     console.error(
-      `Erro ao atualizar: ${err instanceof Error ? err.message : String(err)}`,
+      `Update failed: ${err instanceof Error ? err.message : String(err)}`,
     );
     process.exit(1);
   }

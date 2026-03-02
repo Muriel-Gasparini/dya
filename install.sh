@@ -18,12 +18,12 @@ else
 fi
 
 error() {
-  printf "${RED}Erro: %s${NC}\n" "$1" >&2
+  printf "${RED}Error: %s${NC}\n" "$1" >&2
   exit 1
 }
 
 warn() {
-  printf "${YELLOW}AVISO: %s${NC}\n" "$1"
+  printf "${YELLOW}WARNING: %s${NC}\n" "$1"
 }
 
 info() {
@@ -32,7 +32,7 @@ info() {
 
 # Check for curl
 if ! command -v curl >/dev/null 2>&1; then
-  error "curl nao encontrado. Instale curl e tente novamente."
+  error "curl not found. Install curl and try again."
 fi
 
 # Detect OS
@@ -40,7 +40,7 @@ OS=$(uname -s | tr '[:upper:]' '[:lower:]')
 case "$OS" in
   linux)  OS="linux" ;;
   darwin) OS="darwin" ;;
-  *)      error "Sistema operacional nao suportado: $OS. Apenas Linux e macOS sao suportados." ;;
+  *)      error "Unsupported OS: $OS. Only Linux and macOS are supported." ;;
 esac
 
 # Detect architecture
@@ -49,27 +49,27 @@ case "$ARCH" in
   x86_64)  ARCH="x64" ;;
   aarch64) ARCH="arm64" ;;
   arm64)   ARCH="arm64" ;;
-  *)       error "Arquitetura nao suportada: $ARCH" ;;
+  *)       error "Unsupported architecture: $ARCH" ;;
 esac
 
 # Get latest version
-info "Verificando versao mais recente..."
+info "Checking latest version..."
 LATEST=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name"' | sed 's/.*"v\(.*\)".*/\1/')
 
 if [ -z "$LATEST" ]; then
-  error "Nao foi possivel determinar a versao mais recente. Verifique sua conexao."
+  error "Could not determine latest version. Check your connection."
 fi
 
 ASSET="dya-${OS}-${ARCH}.tar.gz"
 URL="https://github.com/$REPO/releases/download/v${LATEST}/${ASSET}"
 
 # Download and install
-info "Baixando dya v${LATEST} para ${OS}-${ARCH}..."
+info "Downloading dya v${LATEST} for ${OS}-${ARCH}..."
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 
 if ! curl -fsSL "$URL" -o "$TMP/$ASSET"; then
-  error "Falha ao baixar $URL. Verifique se a versao v${LATEST} tem binario para ${OS}-${ARCH}."
+  error "Failed to download $URL. Check if v${LATEST} has a binary for ${OS}-${ARCH}."
 fi
 
 tar xzf "$TMP/$ASSET" -C "$TMP"
@@ -83,9 +83,9 @@ chmod +x "$INSTALL_DIR/dya"
 case ":$PATH:" in
   *":$INSTALL_DIR:"*) ;;
   *)
-    warn "$INSTALL_DIR nao esta no PATH. Adicione ao seu ~/.bashrc ou ~/.zshrc:"
+    warn "$INSTALL_DIR is not in PATH. Add to your ~/.bashrc or ~/.zshrc:"
     info "  export PATH=\"\$HOME/.local/bin:\$PATH\""
     ;;
 esac
 
-printf "${GREEN}dya v${LATEST} instalado com sucesso em ${INSTALL_DIR}/dya${NC}\n"
+printf "${GREEN}dya v${LATEST} installed successfully at ${INSTALL_DIR}/dya${NC}\n"
