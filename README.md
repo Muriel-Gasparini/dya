@@ -34,7 +34,7 @@ dya init
 dya init -o my-config.yaml
 ```
 
-![Using the init command](./using-the-init-command.gif)
+<video src="./dya-init.mp4" autoplay loop muted playsinline></video>
 
 ### Run requests
 
