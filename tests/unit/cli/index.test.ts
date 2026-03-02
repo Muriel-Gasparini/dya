@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { createProgram } from "../../../src/cli/index.js";
+import pkg from "../../../package.json" with { type: "json" };
 
 describe("createProgram", () => {
   it("should create a program named 'dya'", () => {
@@ -7,16 +8,17 @@ describe("createProgram", () => {
     expect(program.name()).toBe("dya");
   });
 
-  it("should register 'run' and 'init' subcommands", () => {
+  it("should register 'run', 'init', and 'update' subcommands", () => {
     const program = createProgram();
     const commandNames = program.commands.map((c) => c.name());
     expect(commandNames).toContain("run");
     expect(commandNames).toContain("init");
+    expect(commandNames).toContain("update");
   });
 
-  it("should have a version set", () => {
+  it("should have version matching package.json", () => {
     const program = createProgram();
-    expect(program.version()).toBe("0.1.0");
+    expect(program.version()).toBe(pkg.version);
   });
 
   it("'run' command should accept a file argument", () => {
@@ -36,5 +38,14 @@ describe("createProgram", () => {
     const outputOpt = initCmd!.options.find((o) => o.long === "--output");
     expect(outputOpt).toBeDefined();
     expect(outputOpt!.defaultValue).toBe("dya.yaml");
+  });
+
+  it("'update' command should be registered", () => {
+    const program = createProgram();
+    const updateCmd = program.commands.find((c) => c.name() === "update");
+    expect(updateCmd).toBeDefined();
+    expect(updateCmd!.description()).toBe(
+      "Check and install latest version",
+    );
   });
 });

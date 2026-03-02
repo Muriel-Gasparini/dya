@@ -15,7 +15,12 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "build:bin": "bun build --compile bin/repeater.ts --outfile dya",
+    "build:bin:linux-x64": "bun build --compile --target=bun-linux-x64 bin/repeater.ts --outfile dya-linux-x64",
+    "build:bin:linux-arm64": "bun build --compile --target=bun-linux-arm64 bin/repeater.ts --outfile dya-linux-arm64",
+    "build:bin:darwin-x64": "bun build --compile --target=bun-darwin-x64 bin/repeater.ts --outfile dya-darwin-x64",
+    "build:bin:darwin-arm64": "bun build --compile --target=bun-darwin-arm64 bin/repeater.ts --outfile dya-darwin-arm64"
   },
   "keywords": [],
   "author": "",
