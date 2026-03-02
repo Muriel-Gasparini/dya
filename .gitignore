@@ -2,4 +2,7 @@ node_modules/
 dist/
 coverage/
 *.tgz
+*.tar.gz
 .DS_Store
+dya
+dya-*
