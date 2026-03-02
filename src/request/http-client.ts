@@ -37,7 +37,7 @@ export class UndiciHttpClient implements HttpClient {
       };
     } catch (error: unknown) {
       if (error instanceof Error) {
-        if (error.name === "AbortError") {
+        if (error.name === "AbortError" || error.name === "TimeoutError") {
           throw new Error(`Timeout of ${options.timeoutMs}ms exceeded`);
         }
 

@@ -2,15 +2,43 @@ import { faker } from "@faker-js/faker";
 import { TemplateError } from "./errors.js";
 
 const TEMPLATE_REGEX =
-  /\{\{\s*faker\.([a-zA-Z0-9]+(?:\.[a-zA-Z0-9]+)+)(?:\(([^)]*)\))?\s*\}\}/g;
+  /\{\{\s*faker\.([a-zA-Z0-9_]+(?:\.[a-zA-Z0-9_]+)+)(?:\(([^)]*)\))?\s*\}\}/g;
 
 /**
  * Parses argument string from template (e.g. "5, true, 'hello'")
  * into an array of typed values.
  */
+/**
+ * Splits a raw argument string by commas, respecting single and double quotes.
+ * Commas inside quoted strings are not treated as delimiters.
+ */
+function splitArgs(raw: string): string[] {
+  const args: string[] = [];
+  let current = "";
+  let inSingle = false;
+  let inDouble = false;
+
+  for (const ch of raw) {
+    if (ch === "'" && !inDouble) {
+      inSingle = !inSingle;
+      current += ch;
+    } else if (ch === '"' && !inSingle) {
+      inDouble = !inDouble;
+      current += ch;
+    } else if (ch === "," && !inSingle && !inDouble) {
+      args.push(current);
+      current = "";
+    } else {
+      current += ch;
+    }
+  }
+  args.push(current);
+  return args;
+}
+
 function parseArgs(raw: string): unknown[] {
   if (!raw.trim()) return [];
-  return raw.split(",").map((arg) => {
+  return splitArgs(raw).map((arg) => {
     const trimmed = arg.trim();
     if (trimmed === "true") return true;
     if (trimmed === "false") return false;

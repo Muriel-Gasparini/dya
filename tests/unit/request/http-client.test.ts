@@ -135,6 +135,23 @@ describe("UndiciHttpClient", () => {
       );
     });
 
+    it("should throw timeout error for TimeoutError (Node.js 20+)", async () => {
+      const timeoutError = new DOMException("The operation timed out", "TimeoutError");
+      mockRequest.mockRejectedValue(timeoutError);
+
+      const options: HttpRequestOptions = {
+        url: "https://api.example.com/slow",
+        method: "GET",
+        headers: {},
+        body: null,
+        timeoutMs: 5000,
+      };
+
+      await expect(client.execute(options)).rejects.toThrow(
+        "Timeout of 5000ms exceeded",
+      );
+    });
+
     it("should include timeoutMs value in timeout error message", async () => {
       const abortError = new Error("The operation was aborted");
       abortError.name = "AbortError";

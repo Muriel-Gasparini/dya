@@ -36,7 +36,14 @@ export async function loadCheckState(
       path.join(configDir, CHECK_FILE),
       "utf-8",
     );
-    return JSON.parse(content) as UpdateCheckState;
+    const parsed = JSON.parse(content);
+    if (
+      typeof parsed?.lastCheckAt !== "string" ||
+      typeof parsed?.latestVersion !== "string"
+    ) {
+      return null;
+    }
+    return parsed as UpdateCheckState;
   } catch {
     return null;
   }

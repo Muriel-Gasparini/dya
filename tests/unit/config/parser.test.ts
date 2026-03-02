@@ -173,6 +173,32 @@ describe("parseConfig", () => {
       }
     });
 
+    it("should throw ConfigError when body contains non-string value (YAML number coercion)", async () => {
+      let tmpDir: string | undefined;
+      try {
+        tmpDir = await mkdtemp(join(tmpdir(), "repeater-test-"));
+        const nonStringBodyPath = join(tmpDir, "non-string-body.yaml");
+        await writeFile(
+          nonStringBodyPath,
+          [
+            "method: POST",
+            "url: https://api.example.com/test",
+            "bodyType: json",
+            "body:",
+            "  count: 42",
+            "  active: true",
+          ].join("\n"),
+        );
+
+        await expect(parseConfig(nonStringBodyPath)).rejects.toThrow(ConfigError);
+        await expect(parseConfig(nonStringBodyPath)).rejects.toThrow(
+          /Invalid config/
+        );
+      } finally {
+        if (tmpDir) await rm(tmpDir, { recursive: true });
+      }
+    });
+
     it("should throw ConfigError with generic message for unknown fs errors (e.g., EISDIR)", async () => {
       let tmpDir: string | undefined;
       try {

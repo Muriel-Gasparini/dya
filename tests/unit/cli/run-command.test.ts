@@ -232,6 +232,33 @@ describe("runCommand", () => {
     expect(mockedRequest).toHaveBeenCalled();
   });
 
+  it("template invalid in headers: prints 'Invalid template' and exits 1", async () => {
+    let tmpDir: string | undefined;
+    try {
+      tmpDir = await mkdtemp(join(tmpdir(), "run-cmd-test-"));
+      const badHeaderPath = join(tmpDir, "bad-header-template.yaml");
+      await writeFile(
+        badHeaderPath,
+        [
+          "method: GET",
+          "url: https://api.example.com/test",
+          "headers:",
+          '  Authorization: "Bearer {{faker.nonExistent.fakeMethod}}"',
+        ].join("\n"),
+      );
+
+      await runCommand(badHeaderPath);
+
+      expect(stderrSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Invalid template"),
+      );
+      expect(exitSpy).toHaveBeenCalledWith(1);
+      expect(mockedRequest).not.toHaveBeenCalled();
+    } finally {
+      if (tmpDir) await rm(tmpDir, { recursive: true });
+    }
+  });
+
   it("ConfigError messages are prefixed with 'Error:' (not 'Unexpected error:')", async () => {
     await runCommand("/nonexistent/config.yaml");
 

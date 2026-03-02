@@ -70,4 +70,25 @@ describe("compareVersions", () => {
     // "9" > "10" lexicographically, but 9 < 10 numerically
     expect(compareVersions("0.9.0", "0.10.0")).toBe(-1);
   });
+
+  it("should handle pre-release tags by stripping suffix (a > b)", () => {
+    expect(compareVersions("0.2.0-beta.1", "0.1.0")).toBe(1);
+  });
+
+  it("should handle pre-release tags by stripping suffix (a < b)", () => {
+    expect(compareVersions("0.1.0-rc.1", "0.2.0")).toBe(-1);
+  });
+
+  it("should handle pre-release tags on both sides (equal base versions)", () => {
+    expect(compareVersions("0.2.0-beta.1", "0.2.0-rc.2")).toBe(0);
+  });
+
+  it("should handle pre-release tag with no patch version", () => {
+    expect(compareVersions("1.0.0-alpha", "0.9.9")).toBe(1);
+  });
+
+  it("should return 0 for non-semver input with same numeric prefix", () => {
+    // Edge case: garbage input should not crash
+    expect(compareVersions("abc", "def")).toBe(0);
+  });
 });

@@ -53,94 +53,101 @@ export class RepeaterRunner {
     let maxDuration = 0;
     const overallStart = performance.now();
 
-    const isInfinite = config.total === "infinite";
-    const totalCount: number = isInfinite
-      ? Infinity
-      : (config.total as number);
+    try {
+      const isInfinite = config.total === "infinite";
+      const totalCount: number = isInfinite
+        ? Infinity
+        : (config.total as number);
 
-    // Set de promises pendentes (para modo infinito, nao acumular array)
-    const pending = new Set<Promise<void>>();
+      // Set de promises pendentes (para modo infinito, nao acumular array)
+      const pending = new Set<Promise<void>>();
 
-    for (let i = 1; i <= totalCount && !this.aborted; i++) {
-      // Backpressure: se todos os slots estao ocupados, aguardar um liberar
-      // Isso evita acumular milhoes de promises na fila do p-limit
-      if (pending.size >= config.concurrency) {
-        await Promise.race(pending);
-      }
-
-      if (this.aborted) break;
-
-      const index = i;
-      const p = limit(async () => {
-        if (this.aborted) return;
-
-        // 1. Resolve templates para body e queryParams
-        const resolvedBody = this.deps.templateEngine.resolveRecord(
-          config.body,
-        );
-        const resolvedParams = this.deps.templateEngine.resolveRecord(
-          config.queryParams,
-        );
-
-        // 2. Build body
-        const { body, contentType } = this.deps.bodyBuilder.build(
-          resolvedBody,
-          config.bodyType,
-        );
-
-        // 3. Build URL com query params
-        const url = new URL(config.url);
-        for (const [k, v] of Object.entries(resolvedParams)) {
-          url.searchParams.append(k, v);
-        }
-        const finalUrl = Object.keys(resolvedParams).length > 0
-          ? url.toString()
-          : config.url;
-
-        // 4. Build headers (Content-Type do bodyBuilder tem precedencia)
-        const headers: Record<string, string> = { ...config.headers };
-        if (contentType) {
-          headers["Content-Type"] = contentType;
+      for (let i = 1; i <= totalCount && !this.aborted; i++) {
+        // Backpressure: se todos os slots estao ocupados, aguardar um liberar
+        // Isso evita acumular milhoes de promises na fila do p-limit
+        if (pending.size >= config.concurrency) {
+          await Promise.race(pending);
         }
 
-        // 5. Execute request
-        const result = await this.deps.requestExecutor.execute({
-          index,
-          method: config.method,
-          url: finalUrl,
-          headers,
-          body,
-          timeoutMs: config.timeoutMs,
+        if (this.aborted) break;
+
+        const index = i;
+        const p = limit(async () => {
+          if (this.aborted) return;
+
+          // 1. Resolve templates para body e queryParams
+          const resolvedBody = this.deps.templateEngine.resolveRecord(
+            config.body,
+          );
+          const resolvedParams = this.deps.templateEngine.resolveRecord(
+            config.queryParams,
+          );
+
+          // 2. Build body
+          const { body, contentType } = this.deps.bodyBuilder.build(
+            resolvedBody,
+            config.bodyType,
+          );
+
+          // 3. Build URL com query params
+          let url: URL;
+          try {
+            url = new URL(config.url);
+          } catch {
+            throw new Error(`Invalid URL: ${config.url}`);
+          }
+          for (const [k, v] of Object.entries(resolvedParams)) {
+            url.searchParams.append(k, v);
+          }
+          const finalUrl = Object.keys(resolvedParams).length > 0
+            ? url.toString()
+            : config.url;
+
+          // 4. Build headers (resolve templates, Content-Type do bodyBuilder tem precedencia)
+          const headers: Record<string, string> = this.deps.templateEngine.resolveRecord(config.headers);
+          if (contentType) {
+            headers["Content-Type"] = contentType;
+          }
+
+          // 5. Execute request
+          const result = await this.deps.requestExecutor.execute({
+            index,
+            method: config.method,
+            url: finalUrl,
+            headers,
+            body,
+            timeoutMs: config.timeoutMs,
+          });
+
+          // 6. Update contadores
+          totalRequests++;
+          if (
+            result.status !== null &&
+            result.status >= config.successRange.min &&
+            result.status <= config.successRange.max
+          ) {
+            successCount++;
+          } else {
+            failureCount++;
+          }
+          sumDuration += result.durationMs;
+          minDuration = Math.min(minDuration, result.durationMs);
+          maxDuration = Math.max(maxDuration, result.durationMs);
+
+          // 7. Report resultado individual
+          this.deps.reporter.reportResult(result, config.total);
         });
 
-        // 6. Update contadores
-        totalRequests++;
-        if (
-          result.status !== null &&
-          result.status >= config.successRange.min &&
-          result.status <= config.successRange.max
-        ) {
-          successCount++;
-        } else {
-          failureCount++;
-        }
-        sumDuration += result.durationMs;
-        minDuration = Math.min(minDuration, result.durationMs);
-        maxDuration = Math.max(maxDuration, result.durationMs);
+        pending.add(p);
+        p.finally(() => pending.delete(p)).catch(() => {/* handled by Promise.all */});
+      }
 
-        // 7. Report resultado individual
-        this.deps.reporter.reportResult(result, config.total);
-      });
-
-      pending.add(p);
-      p.finally(() => pending.delete(p));
+      // Aguardar todas as pendentes
+      await Promise.all(pending);
+    } finally {
+      // Cleanup SIGINT handler (always, even on error)
+      process.removeListener("SIGINT", sigintHandler);
     }
-
-    // Aguardar todas as pendentes
-    await Promise.all(pending);
-
-    // Cleanup SIGINT handler
-    process.removeListener("SIGINT", sigintHandler);
 
     // Build summary
     const summary: ExecutionSummary = {

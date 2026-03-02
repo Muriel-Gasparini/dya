@@ -90,11 +90,11 @@ export async function wizardCommand(options: WizardOptions): Promise<void> {
   }
 
   // 7. Concurrency
-  let concurrency = (await number({
+  let concurrency = ((await number({
     message: "Concurrency (simultaneous requests):",
     default: 1,
     min: 1,
-  })) as number;
+  })) ?? 1) as number;
 
   // 8. Total
   const totalRaw = await input({
@@ -111,11 +111,11 @@ export async function wizardCommand(options: WizardOptions): Promise<void> {
   }
 
   // 9. Timeout
-  const timeoutMs = (await number({
+  const timeoutMs = ((await number({
     message: "Timeout per request (ms):",
     default: 5000,
     min: 100,
-  })) as number;
+  })) ?? 5000) as number;
 
   // 10. Success range (optional)
   const customizeSuccessRange = await confirm({
@@ -124,18 +124,18 @@ export async function wizardCommand(options: WizardOptions): Promise<void> {
 
   let successRange: { min: number; max: number } | undefined;
   if (customizeSuccessRange) {
-    const srMin = (await number({
+    const srMin = ((await number({
       message: "Minimum status code (success):",
       default: 200,
       min: 100,
       max: 599,
-    })) as number;
-    const srMax = (await number({
+    })) ?? 200) as number;
+    const srMax = ((await number({
       message: "Maximum status code (success):",
       default: 299,
       min: 100,
       max: 599,
-    })) as number;
+    })) ?? 299) as number;
     successRange = { min: srMin, max: srMax };
   }
 

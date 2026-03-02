@@ -417,6 +417,48 @@ describe("RepeaterRunner", () => {
     });
   });
 
+  describe("header template resolution", () => {
+    it("should resolve faker templates in headers via resolveRecord", async () => {
+      const resolvedHeaders = { Authorization: "Bearer resolved-token-123" };
+      const deps = makeDeps({
+        templateEngine: {
+          resolve: vi.fn((s: string) => s),
+          resolveRecord: vi.fn((r: Record<string, string>) => {
+            // Return resolved headers when called with template headers
+            if (r.Authorization === "{{faker.string.uuid}}") {
+              return resolvedHeaders;
+            }
+            return { ...r };
+          }),
+          validateRecord: vi.fn(),
+        },
+      });
+      const runner = new RepeaterRunner(deps);
+      const config = makeConfig({
+        headers: { Authorization: "{{faker.string.uuid}}" },
+      });
+
+      await runner.execute(config);
+
+      const executeCall = (deps.requestExecutor.execute as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(executeCall.headers.Authorization).toBe("Bearer resolved-token-123");
+    });
+
+    it("should call resolveRecord for headers on each request (N times for N requests)", async () => {
+      const deps = makeDeps();
+      const runner = new RepeaterRunner(deps);
+      const config = makeConfig({
+        total: 3,
+        headers: { "X-Request-Id": "{{faker.string.uuid}}" },
+      });
+
+      await runner.execute(config);
+
+      // 3 calls per request (body + queryParams + headers) * 3 requests = 9
+      expect(deps.templateEngine.resolveRecord).toHaveBeenCalledTimes(9);
+    });
+  });
+
   describe("template resolution", () => {
     it("should call resolveRecord for body fields", async () => {
       const deps = makeDeps();
@@ -449,8 +491,8 @@ describe("RepeaterRunner", () => {
 
       await runner.execute(config);
 
-      // 2 calls per request (body + queryParams) * 3 requests = 6
-      expect(deps.templateEngine.resolveRecord).toHaveBeenCalledTimes(6);
+      // 3 calls per request (body + queryParams + headers) * 3 requests = 9
+      expect(deps.templateEngine.resolveRecord).toHaveBeenCalledTimes(9);
     });
   });
 
@@ -571,6 +613,32 @@ describe("RepeaterRunner", () => {
     });
   });
 
+  describe("summary counter invariant", () => {
+    it("should satisfy successCount + failureCount === totalRequests with concurrency=5 and mix of results", async () => {
+      let callIndex = 0;
+      const deps = makeDeps({
+        requestExecutor: {
+          execute: vi.fn().mockImplementation(async () => {
+            callIndex++;
+            // Alternate success/failure: even=200, odd=500
+            const status = callIndex % 2 === 0 ? 200 : 500;
+            await new Promise((resolve) => setTimeout(resolve, 1));
+            return makeResult({ index: callIndex, status });
+          }),
+        },
+      });
+      const runner = new RepeaterRunner(deps);
+      const config = makeConfig({ total: 100, concurrency: 5 });
+
+      const summary = await runner.execute(config);
+
+      expect(summary.totalRequests).toBe(100);
+      expect(summary.successCount + summary.failureCount).toBe(summary.totalRequests);
+      expect(summary.successCount).toBe(50);
+      expect(summary.failureCount).toBe(50);
+    });
+  });
+
   describe("all requests failing", () => {
     it("should return summary with 0 success and all failures", async () => {
       const deps = makeDeps({
@@ -650,6 +718,44 @@ describe("RepeaterRunner", () => {
 
       const listenersAfter = process.listenerCount("SIGINT");
       expect(listenersAfter).toBe(listenersBefore);
+    });
+
+    it("should remove SIGINT listener even when bodyBuilder throws synchronous error", async () => {
+      const deps = makeDeps({
+        bodyBuilder: {
+          build: vi.fn().mockImplementation(() => {
+            throw new Error("Sync bodyBuilder error");
+          }),
+        },
+      });
+      const runner = new RepeaterRunner(deps);
+      const config = makeConfig({ total: 1 });
+
+      const listenersBefore = process.listenerCount("SIGINT");
+
+      // The error propagates through Promise.all, so execute rejects
+      await expect(runner.execute(config)).rejects.toThrow("Sync bodyBuilder error");
+
+      const listenersAfter = process.listenerCount("SIGINT");
+      expect(listenersAfter).toBe(listenersBefore);
+    });
+  });
+
+  describe("invalid URL handling", () => {
+    it("should throw descriptive error when config.url is invalid", async () => {
+      const deps = makeDeps();
+      const runner = new RepeaterRunner(deps);
+      const config = makeConfig({ url: "not-a-valid-url" });
+
+      await expect(runner.execute(config)).rejects.toThrow("Invalid URL: not-a-valid-url");
+    });
+
+    it("should throw descriptive error when config.url is empty string", async () => {
+      const deps = makeDeps();
+      const runner = new RepeaterRunner(deps);
+      const config = makeConfig({ url: "" });
+
+      await expect(runner.execute(config)).rejects.toThrow("Invalid URL: ");
     });
   });
 

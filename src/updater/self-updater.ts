@@ -44,7 +44,15 @@ export async function selfUpdate(options: UpdateOptions): Promise<void> {
     }
 
     const buffer = Buffer.from(await response.arrayBuffer());
-    await fs.writeFile(tmpTar, buffer);
+    try {
+      await fs.writeFile(tmpTar, buffer);
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code === "ENOSPC") {
+        throw new Error("Disk full: not enough space to download update");
+      }
+      throw err;
+    }
 
     // 2. Extract to temp dir
     extractDir = await fs.mkdtemp(path.join(os.tmpdir(), "dya-extract-"));
@@ -64,6 +72,9 @@ export async function selfUpdate(options: UpdateOptions): Promise<void> {
       await fs.copyFile(extractedBin, tmpBin);
     } catch (err) {
       const code = (err as NodeJS.ErrnoException).code;
+      if (code === "ENOSPC") {
+        throw new Error("Disk full: not enough space to install update");
+      }
       if (code === "EACCES" || code === "EPERM") {
         throw new Error(
           "Permission denied. Run with appropriate permissions or move the binary to ~/.local/bin",

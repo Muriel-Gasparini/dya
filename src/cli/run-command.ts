@@ -15,6 +15,7 @@ export async function runCommand(file: string): Promise<void> {
     const templateEngine = new FakerTemplateEngine();
     templateEngine.validateRecord(config.body);
     templateEngine.validateRecord(config.queryParams);
+    templateEngine.validateRecord(config.headers);
 
     const httpClient = new UndiciHttpClient();
     const requestExecutor = new RequestExecutor(httpClient);
@@ -36,6 +37,6 @@ export async function runCommand(file: string): Promise<void> {
     } else {
       console.error("Unknown error");
     }
-    process.exit(1);
+    return process.exit(1);
   }
 }

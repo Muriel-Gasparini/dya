@@ -46,8 +46,8 @@ export function getAssetName(): string {
  * Returns -1 if a < b, 0 if a === b, 1 if a > b.
  */
 export function compareVersions(a: string, b: string): -1 | 0 | 1 {
-  const partsA = a.split(".").map(Number);
-  const partsB = b.split(".").map(Number);
+  const partsA = a.split("-")[0].split(".").map(Number);
+  const partsB = b.split("-")[0].split(".").map(Number);
 
   for (let i = 0; i < 3; i++) {
     const va = partsA[i] ?? 0;

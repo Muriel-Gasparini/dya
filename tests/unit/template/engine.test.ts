@@ -130,6 +130,35 @@ describe("FakerTemplateEngine", () => {
       expect(typeof result).toBe("string");
       expect(result).toBeTruthy();
     });
+
+    it("should handle comma inside quoted argument (e.g. fromRegExp with quantifier)", () => {
+      // faker.helpers.fromRegExp('[a-z]{1,5}') has a comma inside single quotes
+      const result = engine.resolve("{{faker.helpers.fromRegExp('[a-z]{1,5}')}}");
+      expect(typeof result).toBe("string");
+      expect(result.length).toBeGreaterThanOrEqual(1);
+      expect(result.length).toBeLessThanOrEqual(5);
+      expect(result).toMatch(/^[a-z]+$/);
+    });
+
+    it("should resolve template with underscore in method path", () => {
+      // faker.raw_definitions does not exist but we test the regex matches underscore paths
+      // Use a valid faker path - faker.string.alpha is valid
+      // Instead, test that underscored path is parsed by the regex (not silently ignored)
+      // faker has no underscore methods in public API, so we test via a non-existent path
+      // to verify the regex matches and throws (rather than ignoring)
+      expect(() =>
+        engine.resolve("{{faker.some_module.some_method}}")
+      ).toThrow(TemplateError);
+      // Prior to fix, this would return the template string unchanged (no regex match)
+    });
+
+    it("should handle comma inside double-quoted argument", () => {
+      const result = engine.resolve('{{faker.helpers.fromRegExp("[0-9]{2,4}")}}');
+      expect(typeof result).toBe("string");
+      expect(result.length).toBeGreaterThanOrEqual(2);
+      expect(result.length).toBeLessThanOrEqual(4);
+      expect(result).toMatch(/^[0-9]+$/);
+    });
   });
 
   describe("resolveRecord", () => {

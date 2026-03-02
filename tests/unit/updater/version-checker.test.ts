@@ -67,6 +67,56 @@ describe("loadCheckState", () => {
     expect(result).toBeNull();
   });
 
+  it("should return null when cache JSON is missing lastCheckAt field", async () => {
+    await fs.writeFile(
+      path.join(tmpDir, "update-check.json"),
+      JSON.stringify({ latestVersion: "0.2.0" }),
+    );
+
+    const result = await loadCheckState(tmpDir);
+    expect(result).toBeNull();
+  });
+
+  it("should return null when cache JSON is missing latestVersion field", async () => {
+    await fs.writeFile(
+      path.join(tmpDir, "update-check.json"),
+      JSON.stringify({ lastCheckAt: "2026-03-01T15:30:00.000Z" }),
+    );
+
+    const result = await loadCheckState(tmpDir);
+    expect(result).toBeNull();
+  });
+
+  it("should return null when cache JSON has non-string lastCheckAt (number)", async () => {
+    await fs.writeFile(
+      path.join(tmpDir, "update-check.json"),
+      JSON.stringify({ lastCheckAt: 12345, latestVersion: "0.2.0" }),
+    );
+
+    const result = await loadCheckState(tmpDir);
+    expect(result).toBeNull();
+  });
+
+  it("should return null when cache JSON has non-string latestVersion (number)", async () => {
+    await fs.writeFile(
+      path.join(tmpDir, "update-check.json"),
+      JSON.stringify({ lastCheckAt: "2026-03-01T15:30:00.000Z", latestVersion: 200 }),
+    );
+
+    const result = await loadCheckState(tmpDir);
+    expect(result).toBeNull();
+  });
+
+  it("should return null when cache JSON has null fields", async () => {
+    await fs.writeFile(
+      path.join(tmpDir, "update-check.json"),
+      JSON.stringify({ lastCheckAt: null, latestVersion: null }),
+    );
+
+    const result = await loadCheckState(tmpDir);
+    expect(result).toBeNull();
+  });
+
   it("should create directory and return null if directory does not exist", async () => {
     const nestedDir = path.join(tmpDir, "deep", "nested", "config");
     const result = await loadCheckState(nestedDir);
@@ -567,6 +617,38 @@ describe("checkAndNotify", () => {
     });
 
     expect(selfUpdate).not.toHaveBeenCalled();
+
+    consoleSpy.mockRestore();
+    consoleErrSpy.mockRestore();
+  });
+
+  it("should be silent when selfUpdate throws an error (e.g. download failure)", async () => {
+    mockGitHubRelease("v0.2.0", [
+      {
+        name: "dya-linux-x64.tar.gz",
+        browser_download_url:
+          "https://github.com/Muriel-Gasparini/dya/releases/download/v0.2.0/dya-linux-x64.tar.gz",
+      },
+    ]);
+
+    const mockRl = {
+      question: vi.fn().mockResolvedValue("y"),
+      close: vi.fn(),
+    };
+    vi.mocked(createInterface).mockReturnValue(mockRl as any);
+    vi.mocked(selfUpdate).mockRejectedValue(new Error("Download failed: Network error"));
+
+    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const consoleErrSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    // Should not throw -- checkAndNotify catches all errors silently
+    await checkAndNotify({
+      currentVersion: "0.1.0",
+      configDir: tmpDir,
+    });
+
+    expect(selfUpdate).toHaveBeenCalled();
+    // Should not crash or throw
 
     consoleSpy.mockRestore();
     consoleErrSpy.mockRestore();
