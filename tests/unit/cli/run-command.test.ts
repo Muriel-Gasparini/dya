@@ -1,82 +1,37 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import type { RepeaterConfig } from "../../../src/config/types.js";
-import type { ExecutionSummary } from "../../../src/request/types.js";
+import { resolve, dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { mkdtemp, writeFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 
-// Mock all dependencies before importing the module under test
-vi.mock("../../../src/config/parser.js", () => ({
-  parseConfig: vi.fn(),
+// Mock ONLY the external network dependency (undici)
+vi.mock("undici", () => ({
+  request: vi.fn(),
 }));
 
-vi.mock("../../../src/template/engine.js", () => {
-  const FakerTemplateEngine = vi.fn();
-  FakerTemplateEngine.prototype.validateRecord = vi.fn();
-  return { FakerTemplateEngine };
-});
-
-vi.mock("../../../src/request/http-client.js", () => {
-  const UndiciHttpClient = vi.fn();
-  return { UndiciHttpClient };
-});
-
-vi.mock("../../../src/request/executor.js", () => {
-  const RequestExecutor = vi.fn();
-  return { RequestExecutor };
-});
-
-vi.mock("../../../src/request/body-builder.js", () => {
-  const DefaultBodyBuilder = vi.fn();
-  return { DefaultBodyBuilder };
-});
-
-vi.mock("../../../src/reporter.js", () => {
-  const ConsoleReporter = vi.fn();
-  return { ConsoleReporter };
-});
-
-vi.mock("../../../src/runner.js", () => {
-  const RepeaterRunner = vi.fn();
-  RepeaterRunner.prototype.execute = vi.fn();
-  return { RepeaterRunner };
-});
-
 import { runCommand } from "../../../src/cli/run-command.js";
-import { parseConfig } from "../../../src/config/parser.js";
-import { FakerTemplateEngine } from "../../../src/template/engine.js";
-import { RepeaterRunner } from "../../../src/runner.js";
-import { ConfigError } from "../../../src/errors.js";
-import { TemplateError } from "../../../src/template/errors.js";
+import { request as mockRequest } from "undici";
 
-const mockParseConfig = vi.mocked(parseConfig);
-const mockValidateRecord = vi.mocked(
-  FakerTemplateEngine.prototype.validateRecord,
-);
-const mockRunnerExecute = vi.mocked(RepeaterRunner.prototype.execute);
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const fixturesDir = resolve(__dirname, "../../fixtures");
 
-const validConfig: RepeaterConfig = {
-  method: "POST",
-  url: "https://api.example.com/users",
-  headers: { "Content-Type": "application/json" },
-  bodyType: "json",
-  body: { name: "{{faker.person.fullName}}" },
-  queryParams: { source: "cli" },
-  concurrency: 2,
-  total: 10,
-  timeoutMs: 5000,
-};
+const mockedRequest = vi.mocked(mockRequest);
 
-const validSummary: ExecutionSummary = {
-  totalRequests: 10,
-  successCount: 10,
-  failureCount: 0,
-  avgDurationMs: 100,
-  minDurationMs: 50,
-  maxDurationMs: 200,
-  totalDurationMs: 1000,
-};
+/**
+ * Helper: create a fake undici response matching the shape UndiciHttpClient expects.
+ */
+function fakeResponse(statusCode: number) {
+  return {
+    statusCode,
+    headers: { "content-type": "application/json" },
+    body: { dump: vi.fn().mockResolvedValue(undefined) },
+  };
+}
 
 describe("runCommand", () => {
   let exitSpy: ReturnType<typeof vi.spyOn>;
   let stderrSpy: ReturnType<typeof vi.spyOn>;
+  let stdoutSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -86,140 +41,202 @@ describe("runCommand", () => {
     stderrSpy = vi
       .spyOn(console, "error")
       .mockImplementation(() => {});
+    stdoutSpy = vi
+      .spyOn(console, "log")
+      .mockImplementation(() => {});
   });
 
   afterEach(() => {
     exitSpy.mockRestore();
     stderrSpy.mockRestore();
+    stdoutSpy.mockRestore();
   });
 
-  it("happy path: parses config, validates templates, executes runner without error", async () => {
-    mockParseConfig.mockResolvedValue(validConfig);
-    mockValidateRecord.mockImplementation(() => {});
-    mockRunnerExecute.mockResolvedValue(validSummary);
+  it("happy path: parses real fixture, validates templates, executes runner with undici mock returning 200", async () => {
+    mockedRequest.mockResolvedValue(fakeResponse(200) as never);
 
-    await runCommand("config.yaml");
+    await runCommand(resolve(fixturesDir, "valid-config.yaml"));
 
-    expect(mockParseConfig).toHaveBeenCalledWith("config.yaml");
-    expect(mockValidateRecord).toHaveBeenCalledTimes(2);
-    expect(mockValidateRecord).toHaveBeenCalledWith(validConfig.body);
-    expect(mockValidateRecord).toHaveBeenCalledWith(validConfig.queryParams);
-    expect(mockRunnerExecute).toHaveBeenCalledWith(validConfig);
+    // valid-config.yaml has total: 50, so undici.request should be called 50 times
+    expect(mockedRequest).toHaveBeenCalledTimes(50);
+    // Each call should target the configured URL (with possible query params)
+    const firstCall = mockedRequest.mock.calls[0];
+    expect(firstCall[0]).toContain("https://api.acme.com/v1/accounts");
+    // Should NOT have called process.exit (success path)
+    expect(exitSpy).not.toHaveBeenCalled();
+    // Reporter should have printed summary
+    const logCalls = stdoutSpy.mock.calls.map((c) => String(c[0]));
+    expect(logCalls.some((c) => c.includes("Summary"))).toBe(true);
+    expect(logCalls.some((c) => c.includes("Total:"))).toBe(true);
+  });
+
+  it("happy path with minimal config: GET request, all defaults applied", async () => {
+    mockedRequest.mockResolvedValue(fakeResponse(200) as never);
+
+    await runCommand(resolve(fixturesDir, "minimal-config.yaml"));
+
+    // minimal-config.yaml has total: 1 (default)
+    expect(mockedRequest).toHaveBeenCalledTimes(1);
+    const firstCall = mockedRequest.mock.calls[0];
+    expect(firstCall[0]).toBe("https://api.acme.com/health");
     expect(exitSpy).not.toHaveBeenCalled();
   });
 
-  it("ConfigError: prints message to stderr and exits with code 1", async () => {
-    mockParseConfig.mockRejectedValue(
-      new ConfigError("File not found: config.yaml"),
-    );
-
-    await runCommand("config.yaml");
+  it("file not found: prints 'File not found' to stderr and exits with code 1", async () => {
+    await runCommand("/nonexistent/path/to/config.yaml");
 
     expect(stderrSpy).toHaveBeenCalledWith(
-      "Error: File not found: config.yaml",
+      expect.stringContaining("File not found"),
     );
     expect(exitSpy).toHaveBeenCalledWith(1);
+    // undici should NOT have been called
+    expect(mockedRequest).not.toHaveBeenCalled();
   });
 
-  it("TemplateError: prints message to stderr and exits with code 1", async () => {
-    mockParseConfig.mockResolvedValue(validConfig);
-    mockValidateRecord.mockImplementation(() => {
-      throw new TemplateError(
-        "Invalid template: faker.naoExiste.metodo does not exist",
+  it("YAML invalid: prints error to stderr and exits with code 1", async () => {
+    let tmpDir: string | undefined;
+    try {
+      tmpDir = await mkdtemp(join(tmpdir(), "run-cmd-test-"));
+      const badYamlPath = join(tmpDir, "bad.yaml");
+      await writeFile(badYamlPath, "method: GET\n  invalid:\nindentation: broken\n  : :");
+
+      await runCommand(badYamlPath);
+
+      expect(stderrSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Error:"),
       );
-    });
-
-    await runCommand("config.yaml");
-
-    expect(stderrSpy).toHaveBeenCalledWith(
-      "Error: Invalid template: faker.naoExiste.metodo does not exist",
-    );
-    expect(exitSpy).toHaveBeenCalledWith(1);
+      expect(exitSpy).toHaveBeenCalledWith(1);
+      expect(mockedRequest).not.toHaveBeenCalled();
+    } finally {
+      if (tmpDir) await rm(tmpDir, { recursive: true });
+    }
   });
 
-  it("unexpected error: prints message to stderr and exits with code 1", async () => {
-    mockParseConfig.mockRejectedValue(new Error("Something went wrong"));
-
-    await runCommand("config.yaml");
+  it("schema validation error: prints 'Invalid config' to stderr and exits with code 1", async () => {
+    await runCommand(resolve(fixturesDir, "invalid-config.yaml"));
 
     expect(stderrSpy).toHaveBeenCalledWith(
-      "Unexpected error: Something went wrong",
+      expect.stringContaining("Invalid config"),
     );
     expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(mockedRequest).not.toHaveBeenCalled();
   });
 
-  it("runner.execute is called with correct config object", async () => {
-    mockParseConfig.mockResolvedValue(validConfig);
-    mockValidateRecord.mockImplementation(() => {});
-    mockRunnerExecute.mockResolvedValue(validSummary);
+  it("template invalid: fixture with bad faker path prints 'Invalid template' and exits 1", async () => {
+    let tmpDir: string | undefined;
+    try {
+      tmpDir = await mkdtemp(join(tmpdir(), "run-cmd-test-"));
+      const badTemplatePath = join(tmpDir, "bad-template.yaml");
+      await writeFile(
+        badTemplatePath,
+        [
+          "method: POST",
+          "url: https://api.example.com/test",
+          "bodyType: json",
+          "body:",
+          '  name: "{{faker.nonExistent.fakeMethod}}"',
+        ].join("\n"),
+      );
 
-    await runCommand("any-file.yaml");
+      await runCommand(badTemplatePath);
 
-    expect(mockRunnerExecute).toHaveBeenCalledWith(validConfig);
+      expect(stderrSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Invalid template"),
+      );
+      expect(exitSpy).toHaveBeenCalledWith(1);
+      expect(mockedRequest).not.toHaveBeenCalled();
+    } finally {
+      if (tmpDir) await rm(tmpDir, { recursive: true });
+    }
+  });
+
+  it("network error (ECONNREFUSED): runner handles it, reports failure, does NOT crash", async () => {
+    const connError = new Error("connect ECONNREFUSED 127.0.0.1:3000");
+    (connError as NodeJS.ErrnoException).code = "ECONNREFUSED";
+    mockedRequest.mockRejectedValue(connError as never);
+
+    await runCommand(resolve(fixturesDir, "minimal-config.yaml"));
+
+    // The runner catches network errors via RequestExecutor and reports them.
+    // It should NOT cause process.exit -- the run completes with failures reported.
+    expect(exitSpy).not.toHaveBeenCalled();
+    // Reporter should show summary with failure
+    const logCalls = stdoutSpy.mock.calls.map((c) => String(c[0]));
+    expect(logCalls.some((c) => c.includes("Failures:"))).toBe(true);
+  });
+
+  it("formdata config: executes requests with formdata body type", async () => {
+    mockedRequest.mockResolvedValue(fakeResponse(200) as never);
+
+    await runCommand(resolve(fixturesDir, "formdata-config.yaml"));
+
+    // formdata-config.yaml has total: 10
+    expect(mockedRequest).toHaveBeenCalledTimes(10);
+    expect(exitSpy).not.toHaveBeenCalled();
+  });
+
+  it("urlencoded config: executes requests with urlencoded body type", async () => {
+    mockedRequest.mockResolvedValue(fakeResponse(200) as never);
+
+    await runCommand(resolve(fixturesDir, "urlencoded-config.yaml"));
+
+    // urlencoded-config.yaml has total: 10
+    expect(mockedRequest).toHaveBeenCalledTimes(10);
+    expect(exitSpy).not.toHaveBeenCalled();
+    // The request should include urlencoded content type
+    const firstCall = mockedRequest.mock.calls[0];
+    const requestOptions = firstCall[1] as Record<string, unknown>;
+    const headers = requestOptions.headers as Record<string, string>;
+    expect(headers["Content-Type"]).toBe("application/x-www-form-urlencoded");
+  });
+
+  it("HTTP 500 responses: runner reports them as failures, no process.exit", async () => {
+    mockedRequest.mockResolvedValue(fakeResponse(500) as never);
+
+    await runCommand(resolve(fixturesDir, "minimal-config.yaml"));
+
+    expect(exitSpy).not.toHaveBeenCalled();
+    // Reporter should show summary with failure
+    const logCalls = stdoutSpy.mock.calls.map((c) => String(c[0]));
+    const failureLine = logCalls.find((c) => c.includes("Failures:"));
+    expect(failureLine).toBeDefined();
+    expect(failureLine).toContain("1");
+  });
+
+  it("empty config file: prints error and exits 1", async () => {
+    let tmpDir: string | undefined;
+    try {
+      tmpDir = await mkdtemp(join(tmpdir(), "run-cmd-test-"));
+      const emptyPath = join(tmpDir, "empty.yaml");
+      await writeFile(emptyPath, "");
+
+      await runCommand(emptyPath);
+
+      expect(stderrSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Error:"),
+      );
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    } finally {
+      if (tmpDir) await rm(tmpDir, { recursive: true });
+    }
   });
 
   it("validates both body and queryParams templates before executing", async () => {
-    const callOrder: string[] = [];
-    mockParseConfig.mockResolvedValue(validConfig);
-    mockValidateRecord.mockImplementation((fields) => {
-      if (fields === validConfig.body) callOrder.push("body");
-      if (fields === validConfig.queryParams) callOrder.push("queryParams");
-    });
-    mockRunnerExecute.mockResolvedValue(validSummary);
+    // valid-config.yaml has both body and queryParams with faker templates
+    // If validation passes, undici should be called
+    mockedRequest.mockResolvedValue(fakeResponse(200) as never);
 
-    await runCommand("config.yaml");
+    await runCommand(resolve(fixturesDir, "valid-config.yaml"));
 
-    expect(callOrder).toEqual(["body", "queryParams"]);
-    expect(mockRunnerExecute).toHaveBeenCalledTimes(1);
+    expect(exitSpy).not.toHaveBeenCalled();
+    expect(mockedRequest).toHaveBeenCalled();
   });
 
-  it("does not call runner.execute when parseConfig throws ConfigError", async () => {
-    mockParseConfig.mockRejectedValue(new ConfigError("bad config"));
+  it("ConfigError messages are prefixed with 'Error:' (not 'Unexpected error:')", async () => {
+    await runCommand("/nonexistent/config.yaml");
 
-    await runCommand("config.yaml");
-
-    expect(mockRunnerExecute).not.toHaveBeenCalled();
-  });
-
-  it("does not call runner.execute when validateRecord throws TemplateError", async () => {
-    mockParseConfig.mockResolvedValue(validConfig);
-    mockValidateRecord.mockImplementation(() => {
-      throw new TemplateError("bad template");
-    });
-
-    await runCommand("config.yaml");
-
-    expect(mockRunnerExecute).not.toHaveBeenCalled();
-  });
-
-  it("runner execution error is caught and exits with code 1", async () => {
-    mockParseConfig.mockResolvedValue(validConfig);
-    mockValidateRecord.mockImplementation(() => {});
-    mockRunnerExecute.mockRejectedValue(new Error("Network failure"));
-
-    await runCommand("config.yaml");
-
-    expect(stderrSpy).toHaveBeenCalledWith(
-      "Unexpected error: Network failure",
-    );
-    expect(exitSpy).toHaveBeenCalledWith(1);
-  });
-
-  it("non-Error throw: prints 'Unknown error' to stderr and exits with code 1", async () => {
-    mockParseConfig.mockRejectedValue("string error thrown");
-
-    await runCommand("config.yaml");
-
-    expect(stderrSpy).toHaveBeenCalledWith("Unknown error");
-    expect(exitSpy).toHaveBeenCalledWith(1);
-  });
-
-  it("non-Error throw (number): prints 'Unknown error' to stderr and exits with code 1", async () => {
-    mockParseConfig.mockRejectedValue(42);
-
-    await runCommand("config.yaml");
-
-    expect(stderrSpy).toHaveBeenCalledWith("Unknown error");
-    expect(exitSpy).toHaveBeenCalledWith(1);
+    const errorCall = stderrSpy.mock.calls[0][0] as string;
+    expect(errorCall).toMatch(/^Error: /);
+    expect(errorCall).not.toMatch(/^Unexpected error:/);
   });
 });

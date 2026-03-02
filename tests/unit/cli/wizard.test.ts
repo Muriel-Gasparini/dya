@@ -1,18 +1,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { stringify } from "yaml";
+import { parse } from "yaml";
+import { mkdtemp, readFile, rm, access } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 
-// Mock @inquirer/prompts
+// Mock @inquirer/prompts (external terminal I/O -- legitimate mock)
 vi.mock("@inquirer/prompts", () => ({
   select: vi.fn(),
   input: vi.fn(),
   confirm: vi.fn(),
   number: vi.fn(),
-}));
-
-// Mock node:fs/promises
-vi.mock("node:fs/promises", () => ({
-  writeFile: vi.fn(),
-  access: vi.fn(),
 }));
 
 import {
@@ -21,31 +18,51 @@ import {
   validateTotal,
 } from "../../../src/cli/wizard.js";
 import { select, input, confirm, number } from "@inquirer/prompts";
-import { writeFile, access } from "node:fs/promises";
 
 const mockSelect = vi.mocked(select);
 const mockInput = vi.mocked(input);
 const mockConfirm = vi.mocked(confirm);
 const mockNumber = vi.mocked(number);
-const mockWriteFile = vi.mocked(writeFile);
-const mockAccess = vi.mocked(access);
 
 describe("wizardCommand", () => {
   let stderrSpy: ReturnType<typeof vi.spyOn>;
   let stdoutSpy: ReturnType<typeof vi.spyOn>;
+  let tmpDir: string;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
     stderrSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     stdoutSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-    // Default: file does not exist
-    mockAccess.mockRejectedValue(new Error("ENOENT"));
+    tmpDir = await mkdtemp(join(tmpdir(), "wizard-test-"));
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     stderrSpy.mockRestore();
     stdoutSpy.mockRestore();
+    await rm(tmpDir, { recursive: true, force: true });
   });
+
+  /**
+   * Helper: returns a temp file path inside the test's temp dir.
+   */
+  function tmpFile(name: string): string {
+    return join(tmpDir, name);
+  }
+
+  /**
+   * Helper: reads and parses the YAML file written by the wizard.
+   */
+  async function readYaml(filePath: string): Promise<Record<string, unknown>> {
+    const content = await readFile(filePath, "utf-8");
+    return parse(content) as Record<string, unknown>;
+  }
+
+  /**
+   * Helper: reads the raw content of the file written by the wizard.
+   */
+  async function readRaw(filePath: string): Promise<string> {
+    return readFile(filePath, "utf-8");
+  }
 
   /**
    * Helper: set up all prompts for a complete POST wizard flow.
@@ -91,33 +108,29 @@ describe("wizardCommand", () => {
     mockConfirm.mockResolvedValueOnce(false);
     // confirm save
     mockConfirm.mockResolvedValueOnce(true);
-
-    mockWriteFile.mockResolvedValue(undefined);
   }
 
-  it("happy path: collects all inputs and writes YAML file", async () => {
+  it("happy path: collects all inputs and writes YAML file to disk", async () => {
     setupFullPostFlow();
+    const outPath = tmpFile("dya.yaml");
 
-    await wizardCommand({ output: "dya.yaml" });
+    await wizardCommand({ output: outPath });
 
-    // Check writeFile was called
-    expect(mockWriteFile).toHaveBeenCalledTimes(1);
-    const [filePath, content] = mockWriteFile.mock.calls[0] as [
-      string,
-      string,
-    ];
-    expect(filePath).toBe("dya.yaml");
-
-    // Validate YAML content
-    expect(content).toContain("method: POST");
-    expect(content).toContain("url: https://api.example.com/users");
-    expect(content).toContain("Authorization: Bearer token123");
-    expect(content).toContain("bodyType: json");
-    expect(content).toContain("name: \"{{faker.person.fullName}}\"");
-    expect(content).toContain("source: cli");
-    expect(content).toContain("concurrency: 5");
-    expect(content).toContain("total: 50");
-    expect(content).toContain("timeoutMs: 5000");
+    // Read the REAL file from disk and parse it as YAML
+    const config = await readYaml(outPath);
+    expect(config.method).toBe("POST");
+    expect(config.url).toBe("https://api.example.com/users");
+    expect((config.headers as Record<string, string>).Authorization).toBe(
+      "Bearer token123",
+    );
+    expect(config.bodyType).toBe("json");
+    expect((config.body as Record<string, string>).name).toBe(
+      "{{faker.person.fullName}}",
+    );
+    expect((config.queryParams as Record<string, string>).source).toBe("cli");
+    expect(config.concurrency).toBe(5);
+    expect(config.total).toBe(50);
+    expect(config.timeoutMs).toBe(5000);
   });
 
   it("GET method: bodyType is automatically 'none', no body prompts asked", async () => {
@@ -127,8 +140,6 @@ describe("wizardCommand", () => {
     mockInput.mockResolvedValueOnce("https://api.example.com/users");
     // add header?
     mockConfirm.mockResolvedValueOnce(false);
-    // NO bodyType select for GET
-    // NO body fields for GET
     // add query param?
     mockConfirm.mockResolvedValueOnce(false);
     // concurrency
@@ -142,17 +153,15 @@ describe("wizardCommand", () => {
     // confirm save
     mockConfirm.mockResolvedValueOnce(true);
 
-    mockWriteFile.mockResolvedValue(undefined);
+    const outPath = tmpFile("test.yaml");
+    await wizardCommand({ output: outPath });
 
-    await wizardCommand({ output: "test.yaml" });
-
-    // Verify bodyType select was NOT called for GET
-    // First select call is method, there should be no second select call
+    // Verify bodyType select was NOT called for GET (only method select)
     expect(mockSelect).toHaveBeenCalledTimes(1);
 
-    const [, content] = mockWriteFile.mock.calls[0] as [string, string];
-    expect(content).toContain("method: GET");
-    expect(content).toContain("bodyType: none");
+    const config = await readYaml(outPath);
+    expect(config.method).toBe("GET");
+    expect(config.bodyType).toBe("none");
   });
 
   it("DELETE method: bodyType is automatically 'none'", async () => {
@@ -162,7 +171,6 @@ describe("wizardCommand", () => {
     mockInput.mockResolvedValueOnce("https://api.example.com/users/1");
     // add header?
     mockConfirm.mockResolvedValueOnce(false);
-    // NO bodyType select for DELETE
     // add query param?
     mockConfirm.mockResolvedValueOnce(false);
     // concurrency
@@ -176,16 +184,15 @@ describe("wizardCommand", () => {
     // confirm save
     mockConfirm.mockResolvedValueOnce(true);
 
-    mockWriteFile.mockResolvedValue(undefined);
+    const outPath = tmpFile("del.yaml");
+    await wizardCommand({ output: outPath });
 
-    await wizardCommand({ output: "del.yaml" });
-
-    const [, content] = mockWriteFile.mock.calls[0] as [string, string];
-    expect(content).toContain("bodyType: none");
-    expect(mockSelect).toHaveBeenCalledTimes(1); // only method select
+    const config = await readYaml(outPath);
+    expect(config.bodyType).toBe("none");
+    expect(mockSelect).toHaveBeenCalledTimes(1);
   });
 
-  it("confirmation 'No': file is NOT saved", async () => {
+  it("confirmation 'No': file is NOT saved on disk", async () => {
     // method
     mockSelect.mockResolvedValueOnce("GET");
     // url
@@ -205,31 +212,34 @@ describe("wizardCommand", () => {
     // confirm save -> NO
     mockConfirm.mockResolvedValueOnce(false);
 
-    await wizardCommand({ output: "dya.yaml" });
+    const outPath = tmpFile("should-not-exist.yaml");
+    await wizardCommand({ output: outPath });
 
-    expect(mockWriteFile).not.toHaveBeenCalled();
+    // Verify file does NOT exist on disk
+    await expect(access(outPath)).rejects.toThrow();
   });
 
-  it("writes YAML using yaml.stringify, not manual string", async () => {
+  it("writes valid, parseable YAML (not manual string)", async () => {
     setupFullPostFlow();
+    const outPath = tmpFile("out.yaml");
 
-    await wizardCommand({ output: "out.yaml" });
+    await wizardCommand({ output: outPath });
 
-    const [, content] = mockWriteFile.mock.calls[0] as [string, string];
-    // Validate it's parseable YAML by trying to parse it
-    // The content should be valid YAML that yaml.stringify would produce
-    expect(typeof content).toBe("string");
-    expect(content.length).toBeGreaterThan(0);
+    const raw = await readRaw(outPath);
+    // Should be valid YAML that parses successfully
+    const parsed = parse(raw);
+    expect(typeof parsed).toBe("object");
+    expect(parsed).not.toBeNull();
     // Should not have JavaScript object notation
-    expect(content).not.toContain("[object Object]");
+    expect(raw).not.toContain("[object Object]");
   });
 
   it("shows preview before saving", async () => {
     setupFullPostFlow();
+    const outPath = tmpFile("preview.yaml");
 
-    await wizardCommand({ output: "dya.yaml" });
+    await wizardCommand({ output: outPath });
 
-    // Check that preview was shown (console.log called with preview markers)
     const calls = stdoutSpy.mock.calls.map((c) => String(c[0]));
     const hasPreviewStart = calls.some((c) => c.includes("--- Preview ---"));
     const hasPreviewEnd = calls.some((c) => c.includes("--- End ---"));
@@ -237,13 +247,15 @@ describe("wizardCommand", () => {
     expect(hasPreviewEnd).toBe(true);
   });
 
-  it("uses custom output path from options", async () => {
+  it("writes file at the specified output path", async () => {
     setupFullPostFlow();
+    const outPath = tmpFile("custom-name.yaml");
 
-    await wizardCommand({ output: "custom/path/config.yaml" });
+    await wizardCommand({ output: outPath });
 
-    const [filePath] = mockWriteFile.mock.calls[0] as [string, string];
-    expect(filePath).toBe("custom/path/config.yaml");
+    // Verify the file exists at the exact path
+    const raw = await readRaw(outPath);
+    expect(raw.length).toBeGreaterThan(0);
   });
 
   it("total 'infinite' is set as string in YAML", async () => {
@@ -266,12 +278,13 @@ describe("wizardCommand", () => {
     // confirm save
     mockConfirm.mockResolvedValueOnce(true);
 
-    mockWriteFile.mockResolvedValue(undefined);
+    const outPath = tmpFile("inf.yaml");
+    await wizardCommand({ output: outPath });
 
-    await wizardCommand({ output: "inf.yaml" });
-
-    const [, content] = mockWriteFile.mock.calls[0] as [string, string];
-    expect(content).toContain("total: infinite");
+    const raw = await readRaw(outPath);
+    expect(raw).toContain("total: infinite");
+    const config = await readYaml(outPath);
+    expect(config.total).toBe("infinite");
   });
 
   it("multiple headers are added correctly", async () => {
@@ -308,13 +321,13 @@ describe("wizardCommand", () => {
     // confirm save
     mockConfirm.mockResolvedValueOnce(true);
 
-    mockWriteFile.mockResolvedValue(undefined);
+    const outPath = tmpFile("multi-header.yaml");
+    await wizardCommand({ output: outPath });
 
-    await wizardCommand({ output: "multi-header.yaml" });
-
-    const [, content] = mockWriteFile.mock.calls[0] as [string, string];
-    expect(content).toContain("Authorization: Bearer abc");
-    expect(content).toContain("X-Custom: value123");
+    const config = await readYaml(outPath);
+    const headers = config.headers as Record<string, string>;
+    expect(headers.Authorization).toBe("Bearer abc");
+    expect(headers["X-Custom"]).toBe("value123");
   });
 
   it("multiple body fields are added correctly", async () => {
@@ -353,13 +366,13 @@ describe("wizardCommand", () => {
     // confirm save
     mockConfirm.mockResolvedValueOnce(true);
 
-    mockWriteFile.mockResolvedValue(undefined);
+    const outPath = tmpFile("body.yaml");
+    await wizardCommand({ output: outPath });
 
-    await wizardCommand({ output: "body.yaml" });
-
-    const [, content] = mockWriteFile.mock.calls[0] as [string, string];
-    expect(content).toContain("email:");
-    expect(content).toContain("phone:");
+    const config = await readYaml(outPath);
+    const body = config.body as Record<string, string>;
+    expect(body.email).toBe("{{faker.internet.email}}");
+    expect(body.phone).toBe("{{faker.phone.number}}");
   });
 
   it("formdata bodyType is set correctly", async () => {
@@ -392,12 +405,11 @@ describe("wizardCommand", () => {
     // confirm save
     mockConfirm.mockResolvedValueOnce(true);
 
-    mockWriteFile.mockResolvedValue(undefined);
+    const outPath = tmpFile("formdata.yaml");
+    await wizardCommand({ output: outPath });
 
-    await wizardCommand({ output: "formdata.yaml" });
-
-    const [, content] = mockWriteFile.mock.calls[0] as [string, string];
-    expect(content).toContain("bodyType: formdata");
+    const config = await readYaml(outPath);
+    expect(config.bodyType).toBe("formdata");
   });
 
   it("prints 'Config discarded.' when user rejects save", async () => {
@@ -420,7 +432,8 @@ describe("wizardCommand", () => {
     // confirm save -> NO
     mockConfirm.mockResolvedValueOnce(false);
 
-    await wizardCommand({ output: "dya.yaml" });
+    const outPath = tmpFile("discard.yaml");
+    await wizardCommand({ output: outPath });
 
     const calls = stdoutSpy.mock.calls.map((c) => String(c[0]));
     const hasDiscarded = calls.some((c) =>
@@ -449,14 +462,13 @@ describe("wizardCommand", () => {
     // confirm save
     mockConfirm.mockResolvedValueOnce(true);
 
-    mockWriteFile.mockResolvedValue(undefined);
+    const outPath = tmpFile("adj.yaml");
+    await wizardCommand({ output: outPath });
 
-    await wizardCommand({ output: "adj.yaml" });
-
-    const [, content] = mockWriteFile.mock.calls[0] as [string, string];
+    const config = await readYaml(outPath);
     // concurrency should be clamped to total (5), not 10
-    expect(content).toContain("concurrency: 5");
-    expect(content).toContain("total: 5");
+    expect(config.concurrency).toBe(5);
+    expect(config.total).toBe(5);
   });
 
   it("does NOT adjust concurrency when total is 'infinite'", async () => {
@@ -479,14 +491,13 @@ describe("wizardCommand", () => {
     // confirm save
     mockConfirm.mockResolvedValueOnce(true);
 
-    mockWriteFile.mockResolvedValue(undefined);
+    const outPath = tmpFile("inf-adj.yaml");
+    await wizardCommand({ output: outPath });
 
-    await wizardCommand({ output: "inf-adj.yaml" });
-
-    const [, content] = mockWriteFile.mock.calls[0] as [string, string];
+    const config = await readYaml(outPath);
     // concurrency should remain 10 since total is infinite
-    expect(content).toContain("concurrency: 10");
-    expect(content).toContain("total: infinite");
+    expect(config.concurrency).toBe(10);
+    expect(config.total).toBe("infinite");
   });
 
   it("does NOT adjust concurrency when concurrency <= total", async () => {
@@ -509,14 +520,13 @@ describe("wizardCommand", () => {
     // confirm save
     mockConfirm.mockResolvedValueOnce(true);
 
-    mockWriteFile.mockResolvedValue(undefined);
+    const outPath = tmpFile("no-adj.yaml");
+    await wizardCommand({ output: outPath });
 
-    await wizardCommand({ output: "no-adj.yaml" });
-
-    const [, content] = mockWriteFile.mock.calls[0] as [string, string];
+    const config = await readYaml(outPath);
     // concurrency should remain 3
-    expect(content).toContain("concurrency: 3");
-    expect(content).toContain("total: 10");
+    expect(config.concurrency).toBe(3);
+    expect(config.total).toBe(10);
   });
 
   it("default successRange: not included in YAML when user declines customization", async () => {
@@ -539,12 +549,13 @@ describe("wizardCommand", () => {
     // confirm save
     mockConfirm.mockResolvedValueOnce(true);
 
-    mockWriteFile.mockResolvedValue(undefined);
+    const outPath = tmpFile("default-sr.yaml");
+    await wizardCommand({ output: outPath });
 
-    await wizardCommand({ output: "default-sr.yaml" });
-
-    const [, content] = mockWriteFile.mock.calls[0] as [string, string];
-    expect(content).not.toContain("successRange");
+    const raw = await readRaw(outPath);
+    expect(raw).not.toContain("successRange");
+    const config = await readYaml(outPath);
+    expect(config.successRange).toBeUndefined();
   });
 
   it("custom successRange: included in YAML when user customizes", async () => {
@@ -571,14 +582,14 @@ describe("wizardCommand", () => {
     // confirm save
     mockConfirm.mockResolvedValueOnce(true);
 
-    mockWriteFile.mockResolvedValue(undefined);
+    const outPath = tmpFile("custom-sr.yaml");
+    await wizardCommand({ output: outPath });
 
-    await wizardCommand({ output: "custom-sr.yaml" });
-
-    const [, content] = mockWriteFile.mock.calls[0] as [string, string];
-    expect(content).toContain("successRange");
-    expect(content).toContain("min: 200");
-    expect(content).toContain("max: 399");
+    const config = await readYaml(outPath);
+    const sr = config.successRange as { min: number; max: number };
+    expect(sr).toBeDefined();
+    expect(sr.min).toBe(200);
+    expect(sr.max).toBe(399);
   });
 });
 
