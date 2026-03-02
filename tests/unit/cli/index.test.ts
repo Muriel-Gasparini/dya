@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 import { createProgram } from "../../../src/cli/index.js";
 
 describe("createProgram", () => {
-  it("should create a program named 'repeater'", () => {
+  it("should create a program named 'dya'", () => {
     const program = createProgram();
-    expect(program.name()).toBe("repeater");
+    expect(program.name()).toBe("dya");
   });
 
   it("should register 'run' and 'init' subcommands", () => {
@@ -35,6 +35,6 @@ describe("createProgram", () => {
     expect(initCmd).toBeDefined();
     const outputOpt = initCmd!.options.find((o) => o.long === "--output");
     expect(outputOpt).toBeDefined();
-    expect(outputOpt!.defaultValue).toBe("repeater.yaml");
+    expect(outputOpt!.defaultValue).toBe("dya.yaml");
   });
 });
