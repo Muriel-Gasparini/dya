@@ -98,7 +98,7 @@ describe("wizardCommand", () => {
   it("happy path: collects all inputs and writes YAML file", async () => {
     setupFullPostFlow();
 
-    await wizardCommand({ output: "repeater.yaml" });
+    await wizardCommand({ output: "dya.yaml" });
 
     // Check writeFile was called
     expect(mockWriteFile).toHaveBeenCalledTimes(1);
@@ -106,7 +106,7 @@ describe("wizardCommand", () => {
       string,
       string,
     ];
-    expect(filePath).toBe("repeater.yaml");
+    expect(filePath).toBe("dya.yaml");
 
     // Validate YAML content
     expect(content).toContain("method: POST");
@@ -205,7 +205,7 @@ describe("wizardCommand", () => {
     // confirm save -> NO
     mockConfirm.mockResolvedValueOnce(false);
 
-    await wizardCommand({ output: "repeater.yaml" });
+    await wizardCommand({ output: "dya.yaml" });
 
     expect(mockWriteFile).not.toHaveBeenCalled();
   });
@@ -227,7 +227,7 @@ describe("wizardCommand", () => {
   it("shows preview before saving", async () => {
     setupFullPostFlow();
 
-    await wizardCommand({ output: "repeater.yaml" });
+    await wizardCommand({ output: "dya.yaml" });
 
     // Check that preview was shown (console.log called with preview markers)
     const calls = stdoutSpy.mock.calls.map((c) => String(c[0]));
@@ -420,7 +420,7 @@ describe("wizardCommand", () => {
     // confirm save -> NO
     mockConfirm.mockResolvedValueOnce(false);
 
-    await wizardCommand({ output: "repeater.yaml" });
+    await wizardCommand({ output: "dya.yaml" });
 
     const calls = stdoutSpy.mock.calls.map((c) => String(c[0]));
     const hasDiscarded = calls.some((c) =>

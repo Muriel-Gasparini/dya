@@ -6,8 +6,8 @@ export function createProgram(): Command {
   const program = new Command();
 
   program
-    .name("repeater")
-    .description("HTTP request repeater CLI")
+    .name("dya")
+    .description("DYA - Destroy Your App")
     .version("0.1.0");
 
   program
@@ -19,7 +19,7 @@ export function createProgram(): Command {
   program
     .command("init")
     .description("Create config via interactive wizard")
-    .option("-o, --output <path>", "Output file path", "repeater.yaml")
+    .option("-o, --output <path>", "Output file path", "dya.yaml")
     .action(wizardCommand);
 
   return program;

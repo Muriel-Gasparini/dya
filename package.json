@@ -1,10 +1,10 @@
 {
-  "name": "repeater",
+  "name": "dya",
   "version": "0.1.0",
   "description": "CLI tool para disparar requests HTTP em massa",
   "type": "module",
   "bin": {
-    "repeater": "./dist/bin/repeater.js"
+    "dya": "./dist/bin/repeater.js"
   },
   "engines": {
     "node": ">=20.0.0"
