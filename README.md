@@ -34,6 +34,8 @@ dya init
 dya init -o my-config.yaml
 ```
 
+![Using the init command](./using-the-init-command.gif)
+
 ### Run requests
 
 ```bash
