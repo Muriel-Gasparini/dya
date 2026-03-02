@@ -1,7 +1,7 @@
 {
   "name": "dya",
   "version": "0.1.0",
-  "description": "CLI tool para disparar requests HTTP em massa",
+  "description": "CLI tool for mass HTTP request dispatching",
   "type": "module",
   "bin": {
     "dya": "./dist/bin/repeater.js"
@@ -23,8 +23,8 @@
     "build:bin:darwin-arm64": "bun build --compile --target=bun-darwin-arm64 bin/repeater.ts --outfile dya-darwin-arm64"
   },
   "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "author": "Muriel Gasparini",
+  "license": "Apache-2.0",
   "packageManager": "pnpm@10.30.3",
   "dependencies": {
     "@faker-js/faker": "^10.3.0",
